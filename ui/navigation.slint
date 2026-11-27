@@ -1,0 +1,138 @@
+import { TempoMotionSettings } from "motion.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+import { TempoAction, TempoIcon } from "controls.slint";
+
+export struct TempoDestination { label: string, icon: image, selected-icon: image, tooltip: string, badge: bool }
+
+component TempoNavIcon inherits Rectangle {
+    in property <image> icon;
+    in property <color> ink;
+    in property <bool> badge;
+    in property <length> size: 22px;
+    width: 38px;
+    height: 30px;
+    TempoIcon { source: root.icon; tint: root.ink; width: root.size; height: root.size; }
+    if root.badge : Rectangle {
+        x: (root.width + root.size) / 2 - 7px;
+        y: (root.height - root.size) / 2;
+        width: 7px; height: 7px;
+        border-radius: TempoTokens.radius-full;
+        background: TempoTheme.danger;
+    }
+}
+
+export component TempoNavItem inherits TempoAction {
+    in property <image> icon;
+    in property <image> selected-icon;
+    in property <string> tooltip;
+    in property <bool> badge;
+    in property <bool> active;
+    in property <bool> bottom;
+    in property <bool> extended;
+    private property <image> visible-icon: root.active && root.selected-icon.width > 0 ? root.selected-icon : root.icon;
+    private property <color> ink: root.active ? TempoTheme.primary : TempoTheme.text-tertiary;
+    accessible-role: tab;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.active;
+    border-radius: TempoTokens.radius-lg;
+    height: root.bottom ? TempoTokens.bottom-tab-height : root.extended ? 46px : 62px;
+    background: root.bottom ? transparent
+        : root.pressed ? TempoTheme.surface-pressed
+        : root.active && root.hovered ? TempoTheme.primary-subtle
+        : root.active ? TempoTheme.primary-soft
+        : root.hovered ? TempoTheme.surface-alt : transparent;
+    animate background { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+
+    if root.bottom : VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: root.active ? 26px : 0px;
+                height: 3px;
+                border-radius: TempoTokens.radius-full;
+                background: TempoTheme.primary;
+                animate width { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; easing: ease-out; }
+            }
+        }
+        Rectangle { height: 8px; }
+        HorizontalLayout {
+            alignment: center;
+            TempoIcon { source: root.visible-icon; tint: root.ink; width: 22px; height: 22px; }
+        }
+        Rectangle { height: 4px; }
+        Text {
+            text: root.label; color: root.ink; font-size: 10px;
+            font-weight: root.active ? 700 : 500;
+            horizontal-alignment: center; overflow: elide;
+        }
+    }
+    if !root.bottom : HorizontalLayout {
+        padding-right: root.extended ? 12px : 6px;
+        cross-axis-alignment: center;
+        Rectangle {
+            width: 6px; height: 28px;
+            Rectangle {
+                width: 3px; height: root.active ? 28px : 0px;
+                border-radius: TempoTokens.radius-full;
+                background: TempoTheme.primary;
+                animate height { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; easing: ease-out; }
+            }
+        }
+        if root.extended : HorizontalLayout {
+            horizontal-stretch: 1;
+            padding-left: 6px; spacing: 10px;
+            cross-axis-alignment: center;
+            TempoNavIcon { icon: root.visible-icon; ink: root.ink; badge: root.badge; }
+            Text {
+                text: root.label; color: root.ink; font-size: 13px;
+                font-weight: root.active ? 700 : 600; overflow: elide;
+                horizontal-stretch: 1;
+            }
+        }
+        if !root.extended : VerticalLayout {
+            horizontal-stretch: 1; spacing: 2px;
+            alignment: center; cross-axis-alignment: center;
+            TempoNavIcon { icon: root.visible-icon; ink: root.ink; badge: root.badge; }
+            Text {
+                text: root.label; color: root.ink; font-size: 10px;
+                font-weight: root.active ? 600 : 500; overflow: elide;
+            }
+        }
+    }
+    if !root.bottom && !root.extended : Tooltip { Text { text: root.tooltip == "" ? root.label : root.tooltip; } }
+}
+
+export component TempoNav inherits Rectangle {
+    in property <[TempoDestination]> destinations;
+    in property <int> selected;
+    in property <bool> bottom;
+    in property <bool> extended;
+    callback selected-index(int);
+    accessible-role: navigation;
+    accessible-label: "Main navigation";
+    if root.bottom : HorizontalLayout {
+        for destination[index] in root.destinations : TempoNavItem {
+            horizontal-stretch: 1;
+            label: destination.label;
+            icon: destination.icon;
+            selected-icon: destination.selected-icon;
+            active: index == root.selected;
+            bottom: true;
+            activated => { root.selected-index(index); }
+        }
+    }
+    if !root.bottom : VerticalLayout {
+        spacing: 6px;
+        for destination[index] in root.destinations : TempoNavItem {
+            label: destination.label;
+            icon: destination.icon;
+            selected-icon: destination.selected-icon;
+            tooltip: destination.tooltip;
+            badge: destination.badge;
+            active: index == root.selected;
+            extended: root.extended;
+            activated => { root.selected-index(index); }
+        }
+    }
+}

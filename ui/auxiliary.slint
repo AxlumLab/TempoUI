@@ -1,0 +1,228 @@
+import { TempoMotionSettings, TempoPresence } from "motion.slint";
+import { ScrollView } from "std-widgets.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+import { TempoAction, TempoIcon } from "controls.slint";
+import { TempoIcons } from "icons.slint";
+
+export component TempoFloatingActionButton inherits TempoAction {
+    in property <image> icon: TempoIcons.add;
+    in property <bool> small;
+    width: root.small ? 40px : 56px;
+    height: self.width;
+    border-radius: TempoTokens.radius-md;
+    background: !root.enabled ? TempoTheme.border : root.pressed ? TempoTheme.primary-pressed
+        : root.hovered ? TempoTheme.primary-hover : TempoTheme.primary;
+    drop-shadow-blur: root.hovered ? 6px : 4px;
+    drop-shadow-offset-y: 2px;
+    drop-shadow-color: #0004;
+    TempoIcon {
+        source: root.icon; tint: root.enabled ? TempoTheme.text-inverse : TempoTheme.text-disabled;
+        width: root.small ? TempoTokens.icon-md : TempoTokens.icon-lg; height: self.width;
+    }
+    Tooltip { Text { text: root.label; } }
+}
+
+export struct TempoGroupTab { label: string, icon: image, tooltip: string }
+
+component TempoGroupTabButton inherits TempoAction {
+    in property <TempoGroupTab> item;
+    in property <bool> active;
+    in property <bool> show-label;
+    out property <length> marker-x: root.x;
+    out property <length> marker-width: root.width;
+    callback marker(length, length);
+    private property <color> ink: root.active ? TempoTheme.text-inverse : TempoTheme.text-secondary;
+    accessible-role: tab;
+    accessible-item-selectable: true;
+    accessible-item-selected: root.active;
+    label: root.item.label;
+    height: 36px;
+    min-width: 42px;
+    preferred-width: max(42px, inner.preferred-width);
+    border-radius: TempoTokens.radius-sm;
+    background: !root.active && root.hovered ? TempoTheme.surface-pressed : transparent;
+    init => { if root.active { root.marker(root.x, root.width); } }
+    changed active => { if root.active { root.marker(root.x, root.width); } }
+    changed marker-x => { if root.active { root.marker(root.x, root.width); } }
+    changed marker-width => { if root.active { root.marker(root.x, root.width); } }
+    inner := HorizontalLayout {
+        alignment: center; cross-axis-alignment: center;
+        padding-left: root.show-label ? 12px : 0px; padding-right: self.padding-left;
+        spacing: TempoTokens.gap6;
+        if root.item.icon.width > 0 : TempoIcon { source: root.item.icon; tint: root.ink; width: 18px; height: 18px; }
+        if root.show-label : Text { text: root.item.label; color: root.ink; font-size: 12px; font-weight: root.active ? 800 : 700; }
+    }
+    Tooltip { Text { text: root.item.tooltip != "" ? root.item.tooltip : root.item.label; } }
+}
+
+export component TempoButtonGroupTabBar inherits Rectangle {
+    in property <[TempoGroupTab]> items;
+    in-out property <int> selected: 0;
+    in property <bool> show-labels: true;
+    in property <LayoutAlignment> alignment: start;
+    out property <length> indicator-x: indicator.x;
+    out property <length> indicator-width: indicator.width;
+    callback selected-index(int);
+    private property <length> target-x;
+    private property <length> target-width;
+    height: 46px;
+    background: TempoTheme.surface-alt;
+    border-width: 1px; border-color: TempoTheme.border; border-radius: TempoTokens.radius-sm;
+    accessible-role: tab-list;
+    Flickable {
+        x: 5px; y: 5px; width: root.width - 10px; height: 36px;
+        content-width: max(self.width, tab-row.preferred-width);
+        content-height: self.height;
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            indicator := Rectangle {
+                x: root.target-x;
+                width: root.selected >= 0 && root.selected < root.items.length ? root.target-width : 0px;
+                height: 36px;
+                border-radius: TempoTokens.radius-sm;
+                background: TempoTheme.primary;
+                animate x, width { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.normal; easing: cubic-bezier(0.215, 0.61, 0.355, 1.0); }
+            }
+            tab-row := HorizontalLayout {
+                spacing: TempoTokens.gap4;
+                alignment: root.alignment;
+                for item[i] in root.items : TempoGroupTabButton {
+                    item: item; active: i == root.selected; show-label: root.show-labels;
+                    marker(x, w) => { root.target-x = x; root.target-width = w; }
+                    activated => { root.selected = i; root.selected-index(i); }
+                }
+            }
+        }
+    }
+}
+
+export enum TempoRefreshState { idle, refreshing, loading, refreshed, loaded, refresh-failed, load-failed, failed, no-more }
+export struct TempoRefreshLabels {
+    pull: string,
+    release: string,
+    refreshing: string,
+    refresh-success: string,
+    refresh-failed: string,
+    pull-to-load: string,
+    release-to-load: string,
+    loading: string,
+    load-success: string,
+    load-failed: string,
+    no-more: string,
+}
+export global TempoRefreshText {
+    public pure function for-language(lang: string) -> TempoRefreshLabels {
+        return lang == "zh" ? {pull: "下拉刷新", release: "松开刷新", refreshing: "正在刷新", refresh-success: "刷新成功", refresh-failed: "刷新失败", pull-to-load: "上拉加载", release-to-load: "松开加载", loading: "正在加载", load-success: "加载成功", load-failed: "加载失败", no-more: "没有更多内容"}
+            : lang == "ja" ? {pull: "下に引いて更新", release: "離して更新", refreshing: "更新中", refresh-success: "更新しました", refresh-failed: "更新に失敗しました", pull-to-load: "上に引いて読み込む", release-to-load: "離して読み込む", loading: "読み込み中", load-success: "読み込みました", load-failed: "読み込みに失敗しました", no-more: "これ以上ありません"}
+            : lang == "ko" ? {pull: "아래로 당겨 새로고침", release: "놓아서 새로고침", refreshing: "새로고침 중", refresh-success: "새로고침 완료", refresh-failed: "새로고침 실패", pull-to-load: "위로 당겨 불러오기", release-to-load: "놓아서 불러오기", loading: "불러오는 중", load-success: "불러오기 완료", load-failed: "불러오기 실패", no-more: "더 이상 항목이 없습니다"}
+            : lang == "vi" ? {pull: "Kéo xuống để làm mới", release: "Thả để làm mới", refreshing: "Đang làm mới", refresh-success: "Đã làm mới", refresh-failed: "Làm mới thất bại", pull-to-load: "Kéo lên để tải thêm", release-to-load: "Thả để tải thêm", loading: "Đang tải", load-success: "Đã tải", load-failed: "Tải thất bại", no-more: "Không còn nội dung"}
+            : {pull: "Pull to refresh", release: "Release to refresh", refreshing: "Refreshing", refresh-success: "Refresh complete", refresh-failed: "Refresh failed", pull-to-load: "Pull to load more", release-to-load: "Release to load more", loading: "Loading", load-success: "Load complete", load-failed: "Load failed", no-more: "No more content"};
+    }
+}
+
+export component TempoRefresh inherits Rectangle {
+    in property <bool> can-refresh: true;
+    in property <bool> can-load-more: false;
+    in property <bool> refresh-on-start;
+    in property <length> trigger-distance: 64px;
+    in property <duration> no-more-duration: 1500ms;
+    in property <TempoRefreshLabels> labels: TempoRefreshText.for-language("en");
+    in-out property <TempoRefreshState> state: idle;
+    out property <bool> footer-visible: footer-motion.present;
+    out property <bool> at-top: scroller.content-y >= -1px;
+    out property <bool> at-end: -scroller.content-y >= scroller.content-height - scroller.visible-height - 1px;
+    private property <bool> ready: root.state != refreshing && root.state != loading;
+    private property <length> pull-offset: gesture.current-position.y - gesture.pressed-position.y;
+    private property <bool> pulling: gesture.swiping && root.at-top && root.pull-offset > 0px;
+    private property <bool> no-more-dismissed: false;
+    private property <bool> refresh-result: root.state == refreshed || root.state == refresh-failed;
+    callback refresh();
+    callback load-more();
+    public function request-refresh() {
+        if root.ready && root.can-refresh { root.state = refreshing; root.refresh(); }
+    }
+    public function request-load-more() {
+        if root.ready && root.can-load-more && root.state != no-more { root.state = loading; root.load-more(); }
+    }
+    public function finish(result: TempoRefreshState) {
+        if result != refreshing && result != loading {
+            root.state = result == failed ? (root.state == refreshing ? refresh-failed : load-failed) : result;
+            settle.running = root.state == refreshed || root.state == loaded || root.state == refresh-failed || root.state == load-failed;
+        }
+    }
+    changed state => {
+        no-more-notice.running = root.state == no-more;
+        root.no-more-dismissed = false;
+    }
+    init => {
+        no-more-notice.running = root.state == no-more;
+        if root.refresh-on-start { root.request-refresh(); }
+    }
+    no-more-notice := Timer {
+        interval: root.no-more-duration;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.no-more-dismissed = true;
+        }
+    }
+    settle := Timer { interval: 550ms; running: false; triggered => { self.running = false; if root.ready { root.state = idle; } } }
+    header-motion := TempoPresence { active: root.state == refreshing || root.refresh-result; }
+    footer-motion := TempoPresence {
+        active: root.state == loading || root.state == loaded || root.state == load-failed
+            || (root.state == no-more && !root.no-more-dismissed);
+    }
+    VerticalLayout {
+        Rectangle {
+            height: root.pulling ? min(44px, root.pull-offset * 0.55) : 44px * header-motion.progress;
+            clip: true;
+            visible: root.pulling || header-motion.present;
+            HorizontalLayout {
+                y: parent.height - 44px; height: 44px;
+                opacity: root.pulling ? min(1.0, root.pull-offset / 35px) : header-motion.progress;
+                alignment: center; cross-axis-alignment: center; spacing: TempoTokens.gap8;
+                TempoIcon {
+                    width: 20px; height: 20px;
+                    source: root.state == refreshed ? TempoIcons.check : root.state == refresh-failed ? TempoIcons.error : TempoIcons.refresh;
+                    tint: root.state == refreshed ? TempoTheme.success : root.state == refresh-failed ? TempoTheme.danger : TempoTheme.primary;
+                }
+                Text {
+                    text: root.state == refreshing ? root.labels.refreshing : root.state == refreshed ? root.labels.refresh-success
+                        : root.state == refresh-failed ? root.labels.refresh-failed : root.pull-offset >= root.trigger-distance ? root.labels.release : root.labels.pull;
+                    color: TempoTheme.text-secondary; font-size: 14px;
+                }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            gesture := SwipeGestureHandler {
+                enabled: root.ready && ((root.can-refresh && root.at-top) || (root.can-load-more && root.at-end && root.state != no-more));
+                handle-swipe-down: root.can-refresh && root.at-top;
+                handle-swipe-up: root.can-load-more && root.at-end && root.state != no-more;
+                swiped => {
+                    if gesture.current-position.y - gesture.pressed-position.y >= root.trigger-distance { root.request-refresh(); }
+                    else if gesture.pressed-position.y - gesture.current-position.y >= root.trigger-distance { root.request-load-more(); }
+                }
+                scroller := ScrollView {
+                    content-width: self.visible-width;
+                    content-height: body.preferred-height;
+                    body := VerticalLayout { @children }
+                }
+            }
+        }
+        Rectangle {
+            height: 42px * footer-motion.progress;
+            visible: footer-motion.present;
+            clip: true;
+            HorizontalLayout {
+                y: 0px; height: 42px; opacity: footer-motion.progress;
+                alignment: center; cross-axis-alignment: center;
+                Text {
+                    text: root.state == loading ? root.labels.loading : root.state == loaded ? root.labels.load-success : root.state == load-failed ? root.labels.load-failed : root.labels.no-more;
+                    color: root.state == load-failed ? TempoTheme.danger : root.state == loaded ? TempoTheme.success : TempoTheme.text-secondary; font-size: 14px;
+                }
+            }
+        }
+    }
+}

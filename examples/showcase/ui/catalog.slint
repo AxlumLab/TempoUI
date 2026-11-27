@@ -1,0 +1,334 @@
+import {
+    TempoTheme, TempoIcons, TempoInsets, TempoNavigationShell, TempoPage, TempoPageHead, TempoAppBar,
+    TempoSection, TempoDivider, TempoButton, TempoIconButton, TempoFloatingActionButton, TempoButtonGroupTabBar,
+    TempoComboBox, TempoDialog, TempoToastHost, TempoTextField, TempoRadioTile, TempoSlider, TempoProgressBar,
+    TempoRefresh, TempoRefreshText, TempoSurface, TempoClickableSurface, TempoAdaptiveSplit, TempoDetailPresentation,
+    TempoPresence, TempoRouteMotion, TempoMotionSettings, TempoVirtualList, TempoReorderList, TempoReorderItem,
+    TempoMenuButton, TempoIndexedStack, TempoStackPage
+} from "@tempo-ui";
+
+export component TempoCatalogWindow inherits Window {
+    title: "Tempo UI · FinUI comparison";
+    preferred-width: 1180px;
+    preferred-height: 820px;
+    min-width: 340px;
+    min-height: 480px;
+    background: TempoTheme.background;
+    in-out property <bool> dark <=> TempoTheme.dark;
+    in-out property <int> tab: 0;
+    in-out property <int> group-index: 0;
+    in-out property <int> selected-choice: -1;
+    in-out property <string> field-value;
+    in-out property <string> submitted;
+    in-out property <int> radio-selected;
+    in-out property <float> stepped: 2;
+    in-out property <int> detail: -1;
+    in-out property <int> route-depth: 0;
+    in-out property <int> route-direction: 1;
+    in-out property <bool> reduced-motion <=> TempoMotionSettings.reduced;
+    private property <int> last-detail: -1;
+    changed detail => { if root.detail >= 0 { root.last-detail = root.detail; } }
+    out property <float> detail-progress: route-motion.progress;
+    in-out property <TempoDetailPresentation> presentation: page;
+    in property <TempoInsets> extra-insets;
+    private property <TempoInsets> insets: {
+        left: root.safe-area-insets.left + root.extra-insets.left,
+        top: root.safe-area-insets.top + root.extra-insets.top,
+        right: root.safe-area-insets.right + root.extra-insets.right,
+        bottom: root.safe-area-insets.bottom + root.extra-insets.bottom,
+    };
+    out property <bool> dialog-open: modal.opened;
+    out property <bool> dialog-presented: modal.presented;
+    out property <float> dialog-progress: modal.motion-progress;
+    out property <float> toast-progress: toasts.motion-progress;
+    in property <[TempoReorderItem]> queue-samples;
+    in-out property <int> reorder-count;
+    in-out property <int> chosen-menu: -1;
+    in-out property <int> instantiated-rows;
+    out property <Point> reorder-origin: reorder.absolute-position;
+    out property <length> reorder-width: reorder.width;
+    out property <string> first-queue-entry: root.queue-samples.length > 0 ? root.queue-samples[0].label : "";
+    out property <bool> menu-open: menu.opened;
+    callback reorder-request(int, int);
+    public function open-actions() { menu.open(); }
+    public function reveal-large-row() { scale-test.ensure-row-visible(3800, instant); }
+    out property <length> large-scroll-y: scale-test.content-y;
+    out property <bool> toast-visible: toasts.showing;
+    out property <bool> refresh-idle: refresh-pane.state == idle;
+    out property <bool> refresh-exhausted: refresh-pane.state == no-more;
+    out property <bool> refresh-footer-visible: refresh-pane.footer-visible;
+    out property <bool> wide-split: split.split;
+    out property <bool> three-pane: split.three-pane;
+    out property <bool> compact: shell.compact;
+    out property <length> group-marker-width: group.indicator-width;
+    out property <length> icon-marker-width: icons-only.indicator-width;
+    out property <bool> combo-open: selector.opened;
+    out property <bool> combo-is-sheet: selector.is-bottom-sheet;
+    out property <Point> radio-point: { x: local-radio.absolute-position.x + 22px, y: local-radio.absolute-position.y + local-radio.height / 2 };
+    out property <bool> radio-focused: local-radio.focused;
+    out property <bool> radio-focus-ring: local-radio.focus-ring-visible;
+    out property <Point> field-center: { x: field.absolute-position.x + 80px, y: field.absolute-position.y + field.height - 22px };
+    out property <Point> heading-origin: catalog-head.absolute-position;
+    out property <Point> refresh-origin: refresh-pane.absolute-position;
+    out property <Point> group-origin: group.absolute-position;
+    in-out property <int> refresh-count;
+    in-out property <int> load-count;
+    in-out property <int> confirmations;
+    callback push-detail(int, bool);
+    callback pop-detail();
+    callback close-route();
+    public function show-dialog() { modal.show(); }
+    public function preview-toast() { toasts.show("Tempo UI", "An existing toast is replaced.", success, 230ms); }
+    public function dismiss-toast() { toasts.dismiss(); }
+    public function request-refresh() { refresh-pane.request-refresh(); }
+    public function request-more() { refresh-pane.request-load-more(); }
+    public function open-combo() { selector.open(); }
+    public function refresh-language-is-chinese() -> bool { return TempoRefreshText.for-language("zh").pull == "下拉刷新"; }
+
+    shell := TempoNavigationShell {
+        insets: root.insets;
+        selected <=> root.tab;
+        show-bottom-bar: !(root.tab == 1 && root.detail >= 0);
+        destinations: [
+            {label: "Controls", icon: TempoIcons.apps, selected-icon: TempoIcons.apps-filled},
+            {label: "Layout", icon: TempoIcons.list},
+            {label: "Refresh", icon: TempoIcons.refresh},
+            {label: "Lists", icon: TempoIcons.list},
+        ];
+        retained := TempoIndexedStack {
+        current-index <=> root.tab;
+        controls := TempoPage {
+            visible: root.tab == 0;
+            spacing: 16px;
+            catalog-head := TempoPageHead {
+                title: "Components";
+                subtitle: "FinUI comparison · Tempo UI";
+                TempoIconButton {
+                    label: "Toggle theme"; tooltip: "Toggle theme"; variant: outline;
+                    icon: root.dark ? TempoIcons.light-mode : TempoIcons.dark-mode;
+                    activated => { root.dark = !root.dark; }
+                }
+            }
+            TempoSection {
+                title: "Tabs, inputs and selection";
+                VerticalLayout {
+                    padding: 14px; spacing: 12px;
+                    group := TempoButtonGroupTabBar {
+                        selected <=> root.group-index;
+                        items: [
+                            {label: "Songs", icon: TempoIcons.list},
+                            {label: "Detailed albums", icon: TempoIcons.book},
+                            {label: "Artists", icon: TempoIcons.person},
+                        ];
+                    }
+                    icons-only := TempoButtonGroupTabBar {
+                        selected <=> root.group-index; show-labels: false;
+                        items: [
+                            {label: "Songs", icon: TempoIcons.list},
+                            {label: "Albums", icon: TempoIcons.book},
+                            {label: "Artists", icon: TempoIcons.person},
+                        ];
+                    }
+                    field := TempoTextField {
+                        label: "Server"; placeholder: "Type the server name"; icon: TempoIcons.search;
+                        text <=> root.field-value; submitted(value) => { root.submitted = value; }
+                    }
+                    TempoTextField {
+                        label: "Passphrase"; placeholder: "Password"; icon: TempoIcons.lock;
+                        input-type: password; input-hints: { auto-correct: false, auto-complete: false };
+                    }
+                    TempoTextField { label: "Disabled"; text: "Read only"; enabled: false; }
+                    TempoTextField { label: "Input with validation"; error: "A name is required."; }
+                    selector := TempoComboBox {
+                        sheet-width: root.width; sheet-height: root.height;
+                        use-bottom-sheet: shell.compact;
+                        sheet-origin: root.absolute-position; bottom-inset: root.insets.bottom;
+                        label: "Quality"; placeholder: "Choose a format"; selected <=> root.selected-choice;
+                        items: [{label: "Original", enabled: true}, {label: "FLAC (unavailable)", enabled: false}, {label: "MP3", enabled: true}];
+                    }
+                }
+                TempoDivider {}
+                local-radio := TempoRadioTile { label: "Local music"; checked: root.radio-selected == 0; activated => { root.radio-selected = 0; } }
+                TempoRadioTile { label: "Remote music"; checked: root.radio-selected == 1; activated => { root.radio-selected = 1; } }
+            }
+            TempoSection {
+                title: "Actions and feedback";
+                VerticalLayout {
+                    padding: 14px; spacing: 12px;
+                    HorizontalLayout {
+                        alignment: start; spacing: 8px; cross-axis-alignment: center;
+                        TempoButton { label: "Dialog"; compact: true; activated => { root.show-dialog(); } }
+                        TempoButton { label: "Toast"; compact: true; variant: secondary; activated => { toasts.show("Tempo UI", "One toast per window.", info, 2s); } }
+                        TempoIconButton { label: "Loading"; icon: TempoIcons.refresh; loading: true; }
+                    }
+                    TempoSlider { label: "Discrete slider"; minimum: 0; maximum: 8; divisions: 4; value <=> root.stepped; }
+                    TempoProgressBar { value: root.stepped / 8; }
+                    TempoProgressBar { indeterminate: true; }
+                    TempoClickableSurface {
+                        label: "Clickable surface"; height: 44px;
+                        Text { text: "Clickable surface · show warning"; horizontal-alignment: center; vertical-alignment: center; color: TempoTheme.text-primary; }
+                        activated => { toasts.show("", "Clicked the surface.", warning, 2s); }
+                    }
+                }
+            }
+        }
+        layout-tab := FocusScope {
+            visible: root.tab == 1;
+            key-pressed(event) => {
+                if (event.text == Key.Escape || event.text == Key.Back) && split.back() { return accept; }
+                return reject;
+            }
+            VerticalLayout {
+                TempoAppBar {
+                    title: "Albums"; subtitle: "Adaptive navigation";
+                    show-back: root.detail >= 0;
+                    back => { root.pop-detail(); }
+                    TempoIconButton {
+                        icon: TempoIcons.palette; label: "Toggle theme";
+                        activated => { root.dark = !root.dark; }
+                    }
+                }
+                split := TempoAdaptiveSplit {
+                    vertical-stretch: 1;
+                    detail-open: root.detail >= 0;
+                    supplementary-enabled: true;
+                    compact-presentation: root.presentation;
+                    dismiss-detail => { root.pop-detail(); }
+                    TempoPage {
+                        x: 0px; y: 0px; width: split.master-width; height: split.height;
+                        visible: split.show-master;
+                        spacing: 10px;
+                        TempoPageHead { title: "Albums"; subtitle: "Page, sheet, or dialog"; }
+                        TempoButton { label: "Open page"; variant: secondary; activated => { root.presentation = page; root.push-detail(1, true); } }
+                        TempoButton { label: "Open sheet"; variant: secondary; activated => { root.presentation = sheet; root.push-detail(2, true); } }
+                        TempoButton { label: "Open dialog"; variant: secondary; activated => { root.presentation = dialog; root.push-detail(3, true); } }
+                    }
+                    if !split.split && reveal.present && root.presentation != page && root.presentation != auto : Rectangle {
+                        background: #000.with-alpha(0.47 * reveal.progress);
+                        TouchArea { clicked => { root.pop-detail(); } }
+                    }
+                    TempoSurface {
+                        visible: split.split || reveal.present;
+                        opacity: split.split || root.presentation == page ? 1 : reveal.progress;
+                        x: split.detail-x + (!split.split && root.presentation == page ? (1 - reveal.progress) * 24px : 0px);
+                        y: split.detail-y + (!split.split && root.presentation == sheet ? (1 - reveal.progress) * split.detail-height : 0px);
+                        width: split.detail-width; height: split.detail-height;
+                        border-radius: split.show-compact-overlay ? 14px : 0px;
+                        TouchArea {}
+                        route-motion := TempoRouteMotion {
+                            route-key: root.detail > 0 ? root.detail : 0;
+                            direction: root.route-direction;
+                            enabled: root.detail >= 0;
+                            TempoPage {
+                            spacing: 12px;
+                            TempoPageHead {
+                                title: root.detail < 0 && split.split ? "Choose an album" : "Detail " + (root.detail >= 0 ? root.detail : root.last-detail);
+                                subtitle: split.split ? "Wide pane" : "Compact destination";
+                                show-navigation: root.detail >= 0;
+                                close-instead: split.split && root.route-depth == 1;
+                                navigate => { root.pop-detail(); }
+                            }
+                            if root.detail >= 0 : TempoButton {
+                                label: "Push nested detail"; variant: secondary;
+                                activated => { root.push-detail(root.detail + 1, false); }
+                            }
+                            if root.route-depth > 1 : TempoButton {
+                                label: "Close all details"; variant: ghost; activated => { root.close-route(); }
+                            }
+                        }
+                        }
+                    }
+                    if split.three-pane : TempoPage {
+                        x: split.supplementary-x; width: split.supplementary-width;
+                        TempoPageHead { title: "Supplementary"; subtitle: "Third pane"; }
+                    }
+                }
+            }
+        }
+        refresh-tab := Rectangle {
+            visible: root.tab == 2;
+            VerticalLayout {
+                TempoAppBar {
+                    title: "Refresh"; subtitle: "Pull down or use the buttons";
+                    TempoIconButton { label: "Refresh"; icon: TempoIcons.refresh; activated => { refresh-pane.request-refresh(); } }
+                    TempoIconButton { label: "Load more"; icon: TempoIcons.add; activated => { refresh-pane.request-load-more(); } }
+                }
+                refresh-pane := TempoRefresh {
+                    can-load-more: true;
+                    refresh => { root.refresh-count += 1; refresh-finish.running = true; }
+                    load-more => { root.load-count += 1; refresh-finish.running = true; }
+                    for i in 20 : Rectangle {
+                        height: 42px;
+                        background: mod(i, 2) == 0 ? TempoTheme.surface : TempoTheme.surface-alt;
+                        Text { x: 16px; text: "Sample entry " + (i + 1); color: TempoTheme.text-primary; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+        list-tab := TempoStackPage {
+            index: 3; selected-index: retained.current-index;
+            VerticalLayout {
+                TempoAppBar {
+                    title: "Flutter replacements"; subtitle: "Virtual list · reorder · action menu";
+                    menu := TempoMenuButton {
+                        items: [
+                            { label: "Play", enabled: true },
+                            { label: "Unavailable", enabled: false },
+                            { label: "Add to queue", icon: TempoIcons.add, enabled: true },
+                        ];
+                        chosen(index) => { root.chosen-menu = index; }
+                    }
+                }
+                VerticalLayout {
+                    padding: 14px; spacing: 6px;
+                    Text { text: "Playback queue — drag the grip or use the arrows"; color: TempoTheme.text-primary; font-size: 13px; }
+                    TempoSurface {
+                        height: 240px;
+                        clip: true;
+                        reorder := TempoReorderList {
+                            items: root.queue-samples;
+                            reordered(from, to) => { root.reorder-count += 1; root.reorder-request(from, to); }
+                        }
+                    }
+                    Text { text: "5,000 tracks with a virtualized delegate"; color: TempoTheme.text-primary; font-size: 13px; }
+                    scale-test := TempoVirtualList {
+                        horizontal-scrollbar-policy: always-off;
+                        vertical-stretch: 1;
+                        for i in 5000 : Rectangle {
+                            height: 32px;
+                            init => { root.instantiated-rows += 1; }
+                            background: mod(i, 2) == 0 ? TempoTheme.surface : TempoTheme.surface-alt;
+                            Text { x: 8px; vertical-alignment: center; text: "Track " + (i + 1); color: TempoTheme.text-secondary; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    }
+    reveal := TempoPresence {
+        active: root.tab == 1 && root.detail >= 0;
+        enter-time: 240ms;
+        exit-time: 180ms;
+    }
+    if root.tab == 0 : TempoFloatingActionButton {
+        x: parent.width - self.width - 20px - root.insets.right;
+        y: parent.height - self.height - 20px - root.insets.bottom - (shell.compact ? 58px : 0px);
+        label: "Add sample"; activated => { root.show-dialog(); }
+    }
+    modal := TempoDialog {
+        title: "Add a music source"; subtitle: "Tempo UI modal with scrollable content";
+        icon: TempoIcons.add;
+        confirmed => { root.confirmations += 1; toasts.show("Confirmed", "The dialog returned a result.", success, 2s); }
+        Text { text: "This only changes the example."; color: TempoTheme.text-primary; wrap: word-wrap; }
+    }
+    toasts := TempoToastHost { bottom-inset: root.insets.bottom; left-inset: root.insets.left; right-inset: root.insets.right; }
+    refresh-finish := Timer {
+        interval: 250ms; running: false;
+        triggered => {
+            self.running = false;
+            refresh-pane.finish(refresh-pane.state == loading ? no-more : idle);
+        }
+    }
+    changed tab => { if root.tab == 1 { layout-tab.focus(); } }
+}

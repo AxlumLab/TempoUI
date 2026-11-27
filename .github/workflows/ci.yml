@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt
+          rustup override set 1.95.0
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth libx11-xcb-dev libxcursor-dev libxi-dev libxkbcommon-x11-dev libfontconfig1-dev fonts-dejavu-core
+      - name: Run workspace checks
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" ./scripts/check.sh winit-software

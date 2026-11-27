@@ -1,0 +1,331 @@
+import { ScrollView } from "std-widgets.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+import { TempoAction, TempoButton, TempoButtonVariant, TempoIcon, TempoIconButton, TempoSurface } from "controls.slint";
+import { TempoDivider } from "patterns.slint";
+import { TempoPresence } from "motion.slint";
+import { TempoIcons } from "icons.slint";
+
+export struct TempoChoice { label: string, enabled: bool }
+
+export component TempoComboBox inherits VerticalLayout {
+    in property <string> label;
+    in property <string> placeholder: "Select…";
+    in property <[TempoChoice]> items;
+    in-out property <int> selected: -1;
+    in property <bool> enabled: true;
+    in property <length> sheet-width;
+    in property <length> sheet-height;
+    in property <Point> sheet-origin;
+    in property <length> bottom-inset;
+    callback selected-index(int);
+    out property <bool> opened: popup.is-open;
+    private property <int> highlighted: -1;
+    in property <bool> use-bottom-sheet: root.sheet-width > 0px && root.sheet-width < TempoTokens.rail-breakpoint;
+    out property <bool> is-bottom-sheet: root.use-bottom-sheet && root.sheet-width > 0px && root.sheet-height > 0px;
+    private property <length> popup-gap: TempoTokens.gap4;
+    private property <length> space-above: max(0px, trigger.absolute-position.y - root.sheet-origin.y - root.popup-gap);
+    private property <length> space-below: max(0px, root.sheet-origin.y + root.sheet-height - root.bottom-inset
+        - trigger.absolute-position.y - trigger.height - root.popup-gap);
+    private property <length> dropdown-height: min(264px, root.items.length * 42px + 8px);
+    out property <bool> opens-above: !root.is-bottom-sheet && root.sheet-height > 0px
+        && root.space-below < root.dropdown-height && root.space-above > root.space-below;
+    private property <length> panel-height: root.is-bottom-sheet
+        ? min(root.sheet-height * 0.5, root.items.length * 42px + 28px + root.bottom-inset)
+        : root.sheet-height > 0px
+            ? min(root.dropdown-height, max(1px, root.opens-above ? root.space-above : root.space-below))
+            : root.dropdown-height;
+    private property <bool> valid: root.selected >= 0 && root.selected < root.items.length;
+    spacing: TempoTokens.gap6;
+    public function open() {
+        if root.enabled && root.items.length > 0 {
+            root.highlighted = root.valid ? root.selected : 0;
+            popup.show();
+        }
+    }
+    public function close() { popup.close(); }
+    function move(delta: int) {
+        if root.items.length > 0 { root.highlighted = clamp(root.highlighted + delta, 0, root.items.length - 1); }
+    }
+    function choose(index: int) {
+        if index >= 0 && index < root.items.length && root.items[index].enabled {
+            root.selected = index;
+            popup.close();
+            root.selected-index(index);
+        }
+    }
+
+    if root.label != "" : Text {
+        text: root.label; color: TempoTheme.text-secondary; font-size: 12px; font-weight: 600;
+    }
+    trigger := TempoAction {
+        label: root.label != "" ? root.label : root.placeholder;
+        enabled: root.enabled;
+        accessible-role: combobox;
+        accessible-expandable: true;
+        accessible-expanded: popup.is-open;
+        accessible-action-expand => { root.open(); }
+        accessible-value: root.valid ? root.items[root.selected].label : "";
+        height: TempoTokens.input-height;
+        background: TempoTheme.surface;
+        border-radius: TempoTokens.radius-md;
+        border-width: 1px;
+        border-color: TempoTheme.border;
+        activated => { if popup.is-open { root.close(); } else { root.open(); } }
+        HorizontalLayout {
+            padding-left: 12px; padding-right: 12px; spacing: 8px;
+            cross-axis-alignment: center;
+            Text {
+                text: root.valid ? root.items[root.selected].label : root.placeholder;
+                horizontal-stretch: 1; font-size: 14px; overflow: elide;
+                color: !root.enabled ? TempoTheme.text-disabled : root.valid ? TempoTheme.text-primary : TempoTheme.text-tertiary;
+            }
+            TempoIcon { source: TempoIcons.chevron-down; width: 18px; height: 18px; }
+        }
+    }
+    entry-motion := TempoPresence { active: popup.is-open; enter-time: root.is-bottom-sheet ? 240ms : 120ms; }
+    popup := PopupWindow {
+        x: root.is-bottom-sheet ? root.sheet-origin.x - root.absolute-position.x : 0px;
+        y: root.is-bottom-sheet ? root.sheet-origin.y - root.absolute-position.y
+            : trigger.y + (root.opens-above ? -root.panel-height - root.popup-gap : trigger.height + root.popup-gap);
+        width: root.is-bottom-sheet ? root.sheet-width : root.width;
+        height: root.is-bottom-sheet ? root.sheet-height : root.panel-height;
+        close-policy: close-on-click-outside;
+        forward-focus: popup-keys;
+        popup-keys := FocusScope {
+            key-pressed(event) => {
+                if event.text == Key.DownArrow { root.move(1); return accept; }
+                if event.text == Key.UpArrow { root.move(-1); return accept; }
+                if event.text == Key.Return || event.text == Key.Space { root.choose(root.highlighted); return accept; }
+                if event.text == Key.Escape { root.close(); return accept; }
+                return reject;
+            }
+            if root.is-bottom-sheet : Rectangle {
+                background: #000.with-alpha(0.47 * entry-motion.progress);
+                TouchArea { clicked => { root.close(); } }
+            }
+            TempoSurface {
+                width: parent.width;
+                height: root.panel-height;
+                x: 0px;
+                y: parent.height - root.panel-height + (root.is-bottom-sheet ? (1 - entry-motion.progress) * root.panel-height : 0px);
+                opacity: root.is-bottom-sheet ? 1 : entry-motion.progress;
+                border-radius: root.is-bottom-sheet ? TempoTokens.radius-xl : TempoTokens.radius-lg;
+                clip: true;
+                TouchArea {}
+                if root.is-bottom-sheet : Rectangle {
+                    y: 8px;
+                    width: 36px; height: 4px;
+                    border-radius: 2px; background: TempoTheme.border-strong;
+                }
+                ScrollView {
+                    x: 4px; y: root.is-bottom-sheet ? 24px : 4px;
+                    width: parent.width - 8px;
+                    height: parent.height - self.y - 4px - (root.is-bottom-sheet ? root.bottom-inset : 0px);
+                    content-width: self.visible-width;
+                    content-height: list.preferred-height;
+                    list := VerticalLayout {
+                        for item[i] in root.items : TempoAction {
+                            private property <bool> highlighted: i == root.highlighted;
+                            changed highlighted => { if self.highlighted { self.ensure-visible(instant); } }
+                            label: item.label; enabled: item.enabled;
+                            height: 42px; border-radius: TempoTokens.radius-sm;
+                            background: i == root.selected || i == root.highlighted ? TempoTheme.primary-soft
+                                : self.hovered && item.enabled ? TempoTheme.surface-alt : transparent;
+                            Text {
+                                x: 12px; width: parent.width - 24px; height: parent.height;
+                                vertical-alignment: center; overflow: elide; text: item.label; font-size: 14px;
+                                color: !item.enabled ? TempoTheme.text-disabled : i == root.selected ? TempoTheme.primary : TempoTheme.text-primary;
+                            }
+                            activated => { root.choose(i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export struct TempoDialogAction { label: string, icon: image, variant: TempoButtonVariant, enabled: bool, close-on-click: bool }
+export component TempoDialog inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <image> icon;
+    in property <string> confirm-label: "Confirm";
+    in property <string> cancel-label: "Cancel";
+    in property <bool> destructive;
+    in property <bool> dismiss-on-backdrop: true;
+    in property <length> panel-width: 520px;
+    in property <bool> bottom-sheet;
+    in property <length> bottom-inset;
+    in property <[TempoDialogAction]> actions;
+    private property <bool> has-actions: root.actions.length > 0 || root.confirm-label != "" || root.cancel-label != "";
+    out property <bool> opened: false;
+    out property <bool> presented: modal.is-open;
+    out property <float> motion-progress: presence.progress;
+    callback action-selected(int);
+    callback confirmed();
+    callback cancelled();
+    callback dismissed();
+    public function show() {
+        if !modal.is-open { modal.show(); }
+        root.opened = true;
+    }
+    public function close() {
+        if root.opened {
+            root.opened = false;
+            if !presence.present { modal.close(); }
+        }
+    }
+    changed presented => {
+        if !root.presented {
+            root.opened = false;
+            root.dismissed();
+        }
+    }
+    presence := TempoPresence {
+        active: root.opened;
+        enter-time: root.bottom-sheet ? 240ms : 180ms;
+        exit-time: root.bottom-sheet ? 180ms : 120ms;
+        exited => { if !root.opened { modal.close(); } }
+    }
+
+    modal := PopupWindow {
+        x: 0px; y: 0px; width: root.width; height: root.height;
+        close-policy: no-auto-close;
+        forward-focus: keys;
+        keys := FocusScope {
+            key-pressed(e) => {
+                if e.text == Key.Escape || e.text == Key.Back {
+                    root.close(); return accept;
+                }
+                return reject;
+            }
+            Rectangle { background: #0007.with-alpha(0.47 * presence.progress); }
+            TouchArea { clicked => { if root.dismiss-on-backdrop { root.close(); } } }
+            TempoSurface {
+                opacity: root.bottom-sheet ? 1 : presence.progress;
+                width: min(root.panel-width, max(0px, root.width - 32px));
+                x: (root.width - self.width) / 2;
+                height: min(root.height - 32px, panel.preferred-height);
+                y: root.bottom-sheet
+                    ? root.height - (self.height + 12px + root.bottom-inset) * presence.progress
+                    : (root.height - self.height) / 2 + 18px * (1.0 - presence.progress);
+                clip: true;
+                accessible-role: groupbox; accessible-label: root.title;
+                // Intercept backdrop presses below the panel without blocking its controls.
+                TouchArea {}
+                panel := VerticalLayout {
+                    HorizontalLayout {
+                        padding: 16px; spacing: 10px; cross-axis-alignment: center;
+                        if root.icon.width > 0 : Rectangle {
+                            width: 36px; height: 36px; background: TempoTheme.primary-soft;
+                            border-radius: TempoTokens.radius-sm;
+                            TempoIcon { source: root.icon; tint: TempoTheme.primary; width: 20px; height: 20px; }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1; spacing: 4px;
+                            Text { text: root.title; color: TempoTheme.text-primary; font-size: 16px; font-weight: 700; wrap: word-wrap; }
+                            if root.subtitle != "" : Text { text: root.subtitle; color: TempoTheme.text-secondary; font-size: 12px; wrap: word-wrap; }
+                        }
+                    }
+                    TempoDivider {}
+                    ScrollView {
+                        vertical-stretch: 1;
+                        preferred-height: min(240px, inner.preferred-height);
+                        content-width: self.visible-width;
+                        content-height: inner.preferred-height;
+                        inner := VerticalLayout { padding: 16px; @children }
+                    }
+                    if root.has-actions : TempoDivider {}
+                    if root.has-actions : FlexboxLayout {
+                        alignment: end; padding: 12px; spacing: 8px;
+                        for action[i] in root.actions : TempoButton {
+                            label: action.label; icon: action.icon; variant: action.variant; compact: true;
+                            enabled: root.opened && action.enabled;
+                            activated => { if action.close-on-click { root.close(); } root.action-selected(i); }
+                        }
+                        if root.actions.length == 0 && root.cancel-label != "" : TempoButton {
+                            enabled: root.opened; label: root.cancel-label; variant: ghost; compact: true;
+                            activated => { root.close(); root.cancelled(); }
+                        }
+                        if root.actions.length == 0 && root.confirm-label != "" : TempoButton {
+                            enabled: root.opened; label: root.confirm-label; variant: root.destructive ? danger : primary; compact: true;
+                            activated => { root.close(); root.confirmed(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component TempoSheet inherits TempoDialog {
+    bottom-sheet: true;
+    confirm-label: "";
+    cancel-label: "";
+}
+
+export enum TempoToastType { info, success, warning, error }
+
+export component TempoToastHost inherits Rectangle {
+    in property <length> bottom-inset: 0px;
+    in property <length> left-inset: 0px;
+    in property <length> right-inset: 0px;
+    out property <bool> presented: presence.present;
+    out property <float> motion-progress: presence.progress;
+    out property <bool> showing: false;
+    private property <string> headline;
+    private property <string> message;
+    private property <TempoToastType> kind: info;
+    private property <color> ink: root.kind == error ? TempoTheme.danger : root.kind == warning ? TempoTheme.warning
+        : root.kind == success ? TempoTheme.success : TempoTheme.info;
+    private property <color> soft: root.kind == error ? TempoTheme.danger-soft : root.kind == warning ? TempoTheme.warning-soft
+        : root.kind == success ? TempoTheme.success-soft : TempoTheme.info-soft;
+    public function show(title: string, message: string, kind: TempoToastType, timeout: duration) {
+        expiry.running = false;
+        root.headline = title;
+        root.message = message;
+        root.kind = kind;
+        root.showing = true;
+        expiry.interval = max(1ms, timeout);
+        expiry.running = true;
+    }
+    public function dismiss() {
+        expiry.running = false;
+        root.showing = false;
+    }
+    expiry := Timer { running: false; interval: 2s; triggered => { root.dismiss(); } }
+    presence := TempoPresence { active: root.showing; }
+    if presence.present : TempoSurface {
+        width: max(0px, min(520px, body.preferred-width, root.width - 32px - root.left-inset - root.right-inset));
+        x: root.left-inset + (parent.width - self.width - root.left-inset - root.right-inset) / 2;
+        y: root.height - root.bottom-inset - self.height - 76px + (1.0 - presence.progress) * 26px;
+        height: 44px;
+        border-radius: TempoTokens.radius-full;
+        drop-shadow-blur: 18px; drop-shadow-offset-y: 8px;
+        drop-shadow-color: TempoTheme.dark ? #0005 : #0002;
+        opacity: presence.progress;
+        accessible-role: region; accessible-live-region: polite;
+        accessible-label: root.headline + " " + root.message;
+        body := HorizontalLayout {
+            padding-left: 10px; padding-right: 8px; spacing: 8px; cross-axis-alignment: center;
+            Rectangle {
+                width: 28px; height: 28px; border-radius: TempoTokens.radius-full; background: root.soft;
+                TempoIcon {
+                    source: root.kind == error ? TempoIcons.error : root.kind == warning ? TempoIcons.warning
+                        : root.kind == success ? TempoIcons.check : TempoIcons.info;
+                    tint: root.ink; width: 17px; height: 17px;
+                }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: root.headline != "" ? root.headline + "  " + root.message : root.message;
+                color: TempoTheme.text-primary; font-size: 12px; font-weight: 700; overflow: elide;
+            }
+            TempoIconButton {
+                enabled: root.showing; size: 24px; icon-size: 16px; label: "Dismiss toast"; icon: TempoIcons.close;
+                activated => { root.dismiss(); }
+            }
+        }
+    }
+}
