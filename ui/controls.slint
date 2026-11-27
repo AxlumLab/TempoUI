@@ -1,0 +1,325 @@
+import { TempoMotionSettings } from "motion.slint";
+import { Spinner } from "std-widgets.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+
+component TempoControlFocus inherits FocusScope {
+    private property <bool> keyboard: false;
+    out property <bool> ring-visible: root.has-focus && root.keyboard;
+    callback handle-key(KeyEvent) -> EventResult;
+
+    public function focus-from-pointer() {
+        root.keyboard = false;
+        root.focus();
+    }
+
+    focus-gained(reason) => { root.keyboard = reason == FocusReason.tab-navigation; }
+    key-pressed(event) => {
+        root.keyboard = true;
+        return root.handle-key(event);
+    }
+}
+
+export component TempoAction inherits Rectangle {
+    in property <string> label;
+    in property <bool> enabled: true;
+    in property <bool> blocked: false;
+    private property <bool> interactive: root.enabled && !root.blocked;
+    out property <bool> hovered: hit.has-hover;
+    out property <bool> pressed: hit.pressed;
+    out property <bool> focused: keys.has-focus;
+    out property <bool> focus-ring-visible: keys.ring-visible;
+    callback activated();
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.interactive;
+    accessible-action-default => { if root.interactive { root.activated(); } }
+    @children
+    keys := TempoControlFocus {
+        enabled: root.interactive;
+        handle-key(e) => {
+            if (e.text == Key.Return || e.text == Key.Space) {
+                if (!e.repeat) { root.activated(); }
+                return accept;
+            }
+            return reject;
+        }
+    }
+    hit := TouchArea {
+        enabled: root.interactive;
+        mouse-cursor: pointer;
+        clicked => { keys.focus-from-pointer(); root.activated(); }
+    }
+    Rectangle {
+        visible: root.focus-ring-visible;
+        border-radius: root.border-radius;
+        border-width: 2px;
+        border-color: TempoTheme.primary;
+    }
+}
+
+export component TempoIcon inherits Image {
+    in property <color> tint: TempoTheme.text-secondary;
+    colorize: root.tint;
+    image-fit: contain;
+}
+
+export enum TempoButtonVariant { primary, secondary, ghost, danger }
+export enum TempoIconButtonVariant { ghost, soft, outline, danger }
+export enum TempoTagVariant { neutral, primary, success, warning, danger }
+
+export component TempoButton inherits TempoAction {
+    in property <image> icon;
+    in property <bool> icon-only: false;
+    in property <bool> compact: false;
+    in property <bool> loading: false;
+    blocked: root.loading;
+    in property <TempoButtonVariant> variant: primary;
+    private property <length> icon-size: root.compact ? TempoTokens.icon-sm : TempoTokens.icon-md;
+    private property <color> ink: !root.enabled ? TempoTheme.text-disabled
+        : root.variant == primary ? TempoTheme.text-inverse
+        : root.variant == danger ? TempoTheme.danger : TempoTheme.primary;
+    min-height: root.compact ? TempoTokens.small-button-height : TempoTokens.button-height;
+    preferred-width: root.icon-only ? self.min-height : inner.preferred-width;
+    border-radius: TempoTokens.radius-md;
+    border-width: root.enabled && (root.variant == secondary || root.variant == danger) ? TempoTokens.border-width : 0px;
+    border-color: root.variant == danger ? TempoTheme.danger.with-alpha(0.35) : TempoTheme.primary.with-alpha(0.25);
+    background: !root.enabled ? (root.variant == ghost ? transparent : TempoTheme.border)
+        : root.variant == primary ? (root.pressed ? TempoTheme.primary-pressed : root.hovered ? TempoTheme.primary-hover : TempoTheme.primary)
+        : root.variant == danger ? TempoTheme.danger-soft
+        : root.variant == secondary ? TempoTheme.primary-soft
+        : root.hovered ? TempoTheme.primary-soft : transparent;
+    animate background { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+    inner := HorizontalLayout {
+        alignment: center;
+        cross-axis-alignment: center;
+        padding-left: root.icon-only ? 0px : 18px;
+        padding-right: self.padding-left;
+        spacing: TempoTokens.gap6;
+        if root.loading : Spinner { width: root.icon-size; height: root.icon-size; indeterminate: true; }
+        if !root.loading && root.icon.width > 0 : TempoIcon {
+            source: root.icon;
+            tint: root.ink;
+            width: root.icon-size;
+            height: root.icon-size;
+        }
+        if !root.icon-only : Text {
+            text: root.label;
+            color: root.ink;
+            font-size: root.compact ? 13px : 15px;
+            font-weight: 600;
+        }
+    }
+}
+
+export component TempoIconButton inherits TempoAction {
+    in property <image> icon;
+    in property <bool> selected;
+    in property <bool> loading: false;
+    in property <string> tooltip;
+    blocked: root.loading;
+    in property <length> size: 36px;
+    in property <length> icon-size: TempoTokens.icon-md;
+    in property <TempoIconButtonVariant> variant: ghost;
+    width: root.size;
+    height: root.size;
+    border-radius: TempoTokens.radius-sm;
+    border-width: root.variant == outline || root.variant == danger ? 1px : 0px;
+    border-color: root.variant == danger ? TempoTheme.danger.with-alpha(0.28) : TempoTheme.border;
+    background: root.variant == soft ? TempoTheme.primary-soft
+        : root.variant == outline ? TempoTheme.surface
+        : root.variant == danger ? TempoTheme.danger-soft
+        : root.hovered && root.enabled ? TempoTheme.surface-alt : transparent;
+    animate background, border-color { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+    if root.loading : Spinner { width: root.icon-size; height: root.icon-size; indeterminate: true; }
+    if !root.loading : TempoIcon {
+        source: root.icon;
+        width: root.icon-size;
+        height: root.icon-size;
+        tint: !root.enabled ? TempoTheme.text-disabled
+            : root.variant == danger ? TempoTheme.danger
+            : root.variant == soft || root.selected ? TempoTheme.primary
+            : root.variant == outline ? TempoTheme.text-primary : TempoTheme.text-secondary;
+    }
+    if root.tooltip != "" : Tooltip { Text { text: root.tooltip; } }
+}
+
+export component TempoSurface inherits Rectangle {
+    background: TempoTheme.surface;
+    border-color: TempoTheme.border;
+    border-width: TempoTokens.border-width;
+    border-radius: TempoTokens.radius-lg;
+    @children
+}
+
+export component TempoTag inherits Rectangle {
+    in property <string> label;
+    in property <image> icon;
+    in property <TempoTagVariant> variant: neutral;
+    height: 24px;
+    preferred-width: inner.preferred-width;
+    border-radius: TempoTokens.radius-full;
+    background: root.variant == primary ? TempoTheme.primary-soft
+        : root.variant == success ? TempoTheme.success-soft
+        : root.variant == warning ? TempoTheme.warning-soft
+        : root.variant == danger ? TempoTheme.danger-soft : TempoTheme.surface-alt;
+    private property <color> foreground: root.variant == primary ? TempoTheme.primary
+        : root.variant == success ? TempoTheme.success
+        : root.variant == warning ? TempoTheme.warning
+        : root.variant == danger ? TempoTheme.danger : TempoTheme.text-secondary;
+    inner := HorizontalLayout {
+        alignment: center;
+        cross-axis-alignment: center;
+        padding-left: 8px; padding-right: 8px;
+        spacing: TempoTokens.gap4;
+        if root.icon.width > 0 : TempoIcon {
+            source: root.icon;
+            tint: root.foreground;
+            width: 12px; height: 12px;
+        }
+        Text { text: root.label; color: root.foreground; font-size: 11px; font-weight: 600; }
+    }
+}
+
+export component TempoTextField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> placeholder;
+    in property <string> error;
+    in property <image> icon;
+    in property <bool> enabled: true;
+    in property <length> field-height: 50px;
+    in property <InputType> input-type: InputType.text;
+    in property <InputMethodHints> input-hints: { auto-correct: true, auto-complete: true };
+    in-out property <string> text <=> input.text;
+    callback edited(string);
+    callback submitted(string);
+    forward-focus: input;
+    spacing: TempoTokens.gap6;
+    if root.label != "" : Text {
+        text: root.label; color: TempoTheme.text-secondary; font-size: 12px; font-weight: 600;
+    }
+    Rectangle {
+        height: root.field-height;
+        background: root.enabled ? TempoTheme.surface : TempoTheme.surface-alt;
+        border-radius: TempoTokens.radius-md;
+        border-color: root.error != "" ? TempoTheme.danger : input.has-focus ? TempoTheme.primary : TempoTheme.border;
+        border-width: input.has-focus ? 1.4px : 1px;
+        HorizontalLayout {
+            padding-left: 12px; padding-right: 12px; spacing: 8px;
+            if root.icon.width > 0 : TempoIcon {
+                source: root.icon; width: 20px; height: 20px; cross-axis-self-alignment: center;
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                Text {
+                    visible: input.text == ""; text: root.placeholder;
+                    x: 0px; width: parent.width; height: parent.height;
+                    horizontal-alignment: left; vertical-alignment: center;
+                    color: TempoTheme.text-tertiary; font-size: root.field-height == 44px ? 13px : 16px;
+                }
+                input := TextInput {
+                    enabled: root.enabled;
+                    input-type: root.input-type;
+                    input-method-hints: root.input-hints;
+                    single-line: true; font-size: root.field-height == 44px ? 13px : 16px;
+                    color: root.enabled ? TempoTheme.text-primary : TempoTheme.text-disabled;
+                    selection-background-color: TempoTheme.primary;
+                    selection-foreground-color: TempoTheme.text-inverse;
+                    vertical-alignment: center;
+                    accessible-label: root.label != "" ? root.label : root.placeholder;
+                    accessible-description: root.error;
+                    edited => { root.edited(self.text); }
+                    accepted => { root.submitted(self.text); }
+                }
+            }
+            @children
+        }
+    }
+    if root.error != "" : Text { text: root.error; color: TempoTheme.danger; font-size: 12px; wrap: word-wrap; }
+}
+
+export component TempoSearch inherits TempoTextField {
+    placeholder: "Search";
+    field-height: TempoTokens.input-height;
+    input-type: search;
+    input-hints: { auto-correct: false, auto-complete: true };
+}
+
+export component TempoSlider inherits Rectangle {
+    in-out property <float> value: 0;
+    in property <string> label: "Progress";
+    in property <float> minimum: 0;
+    in property <float> maximum: 1;
+    in property <int> divisions: 0;
+    in property <bool> enabled: true;
+    private property <float> span: max(0, root.maximum - root.minimum);
+    private property <float> increment: root.divisions > 0 ? root.span / root.divisions : root.span * 0.05;
+    function set-fraction(fraction: float) {
+        if root.enabled && root.span > 0 {
+            let f = clamp(fraction, 0, 1);
+            root.value = root.minimum + root.span * (root.divisions > 0 ? round(f * root.divisions) / root.divisions : f);
+        }
+    }
+    function nudge(delta: float) {
+        if root.enabled && root.span > 0 {
+            root.set-fraction((root.value - root.minimum + delta * root.increment) / root.span);
+        }
+    }
+    private property <float> bounded: root.span > 0 ? clamp((root.value - root.minimum) / root.span, 0, 1) : 0;
+    min-height: 28px;
+    accessible-role: slider;
+    accessible-label: root.label;
+    accessible-value: round(root.bounded * 100) + "%";
+    accessible-enabled: root.enabled;
+    accessible-action-increment => { root.nudge(1); }
+    accessible-action-decrement => { root.nudge(-1); }
+    Rectangle {
+        x: 5px;
+        width: max(0px, root.width - 10px);
+        height: 4px;
+        border-radius: 2px;
+        background: TempoTheme.primary-soft;
+        Rectangle {
+            x: 0px;
+            width: parent.width * root.bounded;
+            height: parent.height;
+            border-radius: 2px;
+            background: TempoTheme.primary;
+        }
+    }
+    Rectangle {
+        x: max(0px, root.width - self.width) * root.bounded;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        border-width: keys.ring-visible ? 2px : 0px;
+        border-color: TempoTheme.text-primary;
+        background: TempoTheme.primary;
+    }
+    keys := TempoControlFocus {
+        enabled: root.enabled;
+        handle-key(e) => {
+            if e.text == Key.LeftArrow { root.nudge(-1); return accept; }
+            if e.text == Key.RightArrow { root.nudge(1); return accept; }
+            return reject;
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        moved => {
+            if self.pressed { root.set-fraction((self.mouse-x - 5px) / max(1px, self.width - 10px)); }
+        }
+        clicked => {
+            keys.focus-from-pointer();
+            root.set-fraction((self.mouse-x - 5px) / max(1px, self.width - 10px));
+        }
+    }
+}
+
+export component TempoClickableSurface inherits TempoAction {
+    background: root.pressed ? TempoTheme.surface-pressed : root.hovered ? TempoTheme.surface-alt : TempoTheme.surface;
+    border-color: TempoTheme.border;
+    border-width: TempoTokens.border-width;
+    border-radius: TempoTokens.radius-lg;
+    @children
+}

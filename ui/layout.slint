@@ -1,0 +1,189 @@
+import { ScrollView } from "std-widgets.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+import { TempoIconButton } from "controls.slint";
+import { TempoIcons } from "icons.slint";
+import { TempoNav, TempoDestination } from "navigation.slint";
+
+export struct TempoInsets { left: length, top: length, right: length, bottom: length }
+
+export component TempoNavigationContent inherits Rectangle {
+    in property <TempoInsets> insets;
+    background: TempoTheme.background;
+    Rectangle {
+        x: root.insets.left; y: root.insets.top;
+        width: max(0px, root.width - root.insets.left - root.insets.right);
+        height: max(0px, root.height - root.insets.top - root.insets.bottom);
+        @children
+    }
+}
+
+export component TempoAppBar inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> show-back;
+    in property <string> back-label: "Back";
+    callback back();
+    height: 58px;
+    background: TempoTheme.surface;
+    accessible-role: banner;
+    HorizontalLayout {
+        padding-left: root.show-back ? 10px : TempoTokens.page-padding;
+        padding-right: TempoTokens.gap8;
+        spacing: TempoTokens.gap8;
+        cross-axis-alignment: center;
+        if root.show-back : TempoIconButton {
+            icon: TempoIcons.chevron-left; label: root.back-label;
+            activated => { root.back(); }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1; spacing: 2px;
+            Text { text: root.title; color: TempoTheme.text-primary; font-size: 16px; font-weight: 700; overflow: elide; }
+            if root.subtitle != "" : Text { text: root.subtitle; color: TempoTheme.text-secondary; font-size: 12px; overflow: elide; }
+        }
+        @children
+    }
+}
+
+export component TempoPageHead inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <bool> show-navigation;
+    in property <bool> close-instead;
+    callback navigate();
+    spacing: TempoTokens.gap8; cross-axis-alignment: center;
+    if root.show-navigation : TempoIconButton {
+        icon: root.close-instead ? TempoIcons.close : TempoIcons.chevron-left;
+        variant: outline; label: root.close-instead ? "Close" : "Back";
+        activated => { root.navigate(); }
+    }
+    VerticalLayout {
+        horizontal-stretch: 1; spacing: TempoTokens.gap4;
+        Text { text: root.title; color: TempoTheme.text-primary; font-size: 22px; font-weight: 800; overflow: elide; }
+        if root.subtitle != "" : Text { text: root.subtitle; color: TempoTheme.text-secondary; font-size: 12px; font-weight: 500; overflow: elide; }
+    }
+    @children
+}
+
+export component TempoPage inherits Rectangle {
+    in property <TempoInsets> insets;
+    in property <length> content-padding-left: TempoTokens.page-padding;
+    in property <length> content-padding-right: TempoTokens.page-padding;
+    in property <length> content-padding-top: TempoTokens.gap12;
+    in property <length> content-padding-bottom: TempoTokens.gap24;
+    in property <length> bottom-padding: TempoTokens.gap24;
+    in property <length> spacing;
+    in-out property <length> scroll-y <=> scroller.content-y;
+    TempoNavigationContent {
+        insets: root.insets;
+        scroller := ScrollView {
+            content-width: self.visible-width;
+            content-height: body.preferred-height;
+            body := VerticalLayout {
+                padding-left: root.content-padding-left; padding-right: root.content-padding-right;
+                padding-top: root.content-padding-top; padding-bottom: root.content-padding-bottom + root.bottom-padding;
+                spacing: root.spacing;
+                @children
+            }
+        }
+    }
+}
+
+export component TempoNavigationShell inherits Rectangle {
+    in property <[TempoDestination]> destinations;
+    in-out property <int> selected;
+    in property <TempoInsets> insets;
+    in property <bool> auto-extend: true;
+    in property <bool> show-bottom-bar: true;
+    out property <bool> compact: root.width < TempoTokens.rail-breakpoint;
+    out property <bool> extended: root.auto-extend && root.width >= TempoTokens.extended-rail-breakpoint;
+    callback selected-index(int);
+    background: TempoTheme.background;
+    VerticalLayout {
+        x: 0px; y: 0px; width: root.width; height: root.height;
+        HorizontalLayout {
+            vertical-stretch: 1;
+            if !root.compact : Rectangle {
+                width: (root.extended ? TempoTokens.desktop-nav-rail-extended-width : TempoTokens.desktop-nav-rail-width) + root.insets.left;
+                background: TempoTheme.surface;
+                Rectangle { x: parent.width - 1px; width: 1px; background: TempoTheme.border; }
+                VerticalLayout {
+                    padding-left: root.insets.left + 10px; padding-right: 10px;
+                    padding-top: root.insets.top + 16px; padding-bottom: root.insets.bottom + 4px;
+                    TempoNav {
+                        destinations: root.destinations; selected: root.selected; extended: root.extended;
+                        selected-index(i) => { root.selected = i; root.selected-index(i); }
+                    }
+                    Rectangle { vertical-stretch: 1; }
+                }
+            }
+            TempoNavigationContent {
+                horizontal-stretch: 1;
+                insets: {
+                    left: root.compact ? root.insets.left : 0px,
+                    right: root.insets.right,
+                    top: root.insets.top,
+                    bottom: root.compact && root.show-bottom-bar ? 0px : root.insets.bottom,
+                };
+                @children
+            }
+        }
+        if root.compact && root.show-bottom-bar : Rectangle {
+            height: TempoTokens.bottom-tab-height + root.insets.bottom;
+            background: TempoTheme.surface;
+            Rectangle { y: 0px; height: 1px; background: TempoTheme.border; }
+            TempoNav {
+                x: root.insets.left; y: 0px;
+                width: parent.width - root.insets.left - root.insets.right;
+                height: TempoTokens.bottom-tab-height;
+                destinations: root.destinations; selected: root.selected; bottom: true;
+                selected-index(i) => { root.selected = i; root.selected-index(i); }
+            }
+        }
+    }
+}
+
+export enum TempoDetailPresentation { auto, page, sheet, dialog }
+
+export component TempoAdaptiveSplit inherits Rectangle {
+    in property <bool> split-enabled: true;
+    in property <bool> supplementary-enabled;
+    in property <bool> detail-open;
+    in property <TempoDetailPresentation> compact-presentation: auto;
+    in property <length> split-width: 900px;
+    in property <length> split-min-height: 600px;
+    in property <float> split-min-aspect: 1.2;
+    in property <length> preferred-master: 420px;
+    in property <length> minimum-detail: 560px;
+    in property <length> preferred-supplementary: 420px;
+    in property <length> minimum-supplementary: 420px;
+    out property <bool> split: root.split-enabled && root.width >= root.split-width
+        && root.height >= root.split-min-height && root.width >= root.height * root.split-min-aspect;
+    out property <bool> three-pane: root.split && root.supplementary-enabled
+        && root.width >= root.preferred-master + root.minimum-detail + root.minimum-supplementary + 2px;
+    out property <bool> show-master: root.split || !root.detail-open || root.compact-presentation == sheet || root.compact-presentation == dialog;
+    out property <bool> show-detail: root.split || root.detail-open;
+    out property <bool> show-compact-overlay: !root.split && root.detail-open
+        && (root.compact-presentation == sheet || root.compact-presentation == dialog);
+    out property <length> master-width: root.split ? min(root.preferred-master, max(0px, root.width - root.minimum-detail - 1px)) : root.width;
+    out property <length> detail-width: root.split ? (root.three-pane
+        ? min(max(root.minimum-detail, root.preferred-supplementary), root.width - root.master-width - root.minimum-supplementary - 2px)
+        : max(0px, root.width - root.master-width - 1px))
+        : root.compact-presentation == dialog ? min(480px, root.width - 32px) : root.width;
+    out property <length> detail-x: root.split ? root.master-width + 1px : (root.width - root.detail-width) / 2;
+    out property <length> detail-height: !root.split && root.compact-presentation == sheet ? min(480px, root.height * 0.8)
+        : !root.split && root.compact-presentation == dialog ? min(420px, root.height - 32px) : root.height;
+    out property <length> detail-y: !root.split && root.compact-presentation == sheet ? root.height - root.detail-height
+        : (root.height - root.detail-height) / 2;
+    out property <length> supplementary-x: root.detail-x + root.detail-width + 1px;
+    out property <length> supplementary-width: max(0px, root.width - root.supplementary-x);
+    callback dismiss-detail();
+    public function back() -> bool {
+        if root.detail-open { root.dismiss-detail(); return true; }
+        return false;
+    }
+    background: TempoTheme.background;
+    clip: true;
+    if root.split : Rectangle { x: root.master-width; width: 1px; background: TempoTheme.border; }
+    if root.three-pane : Rectangle { x: root.supplementary-x - 1px; width: 1px; background: TempoTheme.border; }
+    @children
+}

@@ -1,0 +1,200 @@
+import { TempoMotionSettings, TempoPresence } from "motion.slint";
+import { ListView, ScrollView } from "std-widgets.slint";
+import { TempoAction, TempoIcon, TempoIconButton, TempoSurface } from "controls.slint";
+import { TempoIcons } from "icons.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+
+// Use the native ListView type directly. Inheriting it in another component
+// hides the model repeater from Slint's virtualization pass.
+export { ListView as TempoVirtualList } from "std-widgets.slint";
+
+export component TempoStackPage inherits FocusScope {
+    in property <int> index;
+    in property <int> selected-index;
+    in property <bool> active: root.index == root.selected-index;
+    visible: root.active;
+    enabled: root.active;
+    @children
+}
+
+export component TempoIndexedStack inherits Rectangle {
+    in-out property <int> current-index;
+    clip: true;
+    @children
+}
+
+export struct TempoMenuEntry { label: string, icon: image, enabled: bool }
+export component TempoMenuButton inherits TempoAction {
+    in property <[TempoMenuEntry]> items;
+    in property <image> icon: TempoIcons.more;
+    in property <length> menu-width: 208px;
+    out property <bool> opened: popup.is-open;
+    callback chosen(int);
+    private property <int> highlighted;
+    width: 36px;
+    height: 36px;
+    label: "Actions";
+    border-radius: TempoTokens.radius-sm;
+    background: root.opened || root.hovered ? TempoTheme.surface-pressed : transparent;
+    animate background { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+    accessible-expandable: true;
+    accessible-expanded: root.opened;
+    accessible-action-expand => { root.open(); }
+    activated => { if root.opened { popup.close(); } else { root.open(); } }
+    public function open() { if root.enabled && root.items.length > 0 { root.highlighted = 0; popup.show(); } }
+    function choose(i: int) {
+        if i >= 0 && i < root.items.length && root.items[i].enabled {
+            popup.close(); root.chosen(i);
+        }
+    }
+    TempoIcon { source: root.icon; width: 20px; height: 20px; }
+    appearance := TempoPresence { active: popup.is-open; enter-time: TempoTokens.fast; }
+    popup := PopupWindow {
+        x: root.width - root.menu-width;
+        y: root.height + 4px;
+        width: root.menu-width;
+        height: min(260px, root.items.length * 36px + 8px);
+        close-policy: close-on-click-outside;
+        forward-focus: hotkeys;
+        hotkeys := FocusScope {
+            key-pressed(e) => {
+                if e.text == Key.DownArrow { root.highlighted = min(root.items.length - 1, root.highlighted + 1); return accept; }
+                if e.text == Key.UpArrow { root.highlighted = max(0, root.highlighted - 1); return accept; }
+                if e.text == Key.Return || e.text == Key.Space { root.choose(root.highlighted); return accept; }
+                if e.text == Key.Escape { popup.close(); return accept; }
+                return reject;
+            }
+            TempoSurface {
+                clip: true;
+                opacity: appearance.progress;
+                ScrollView {
+                    x: 4px; y: 4px; width: parent.width - 8px; height: parent.height - 8px;
+                    content-width: self.visible-width;
+                    content-height: root.items.length * 36px;
+                    VerticalLayout {
+                        for item[i] in root.items : TempoAction {
+                            in property <bool> active: i == root.highlighted;
+                            changed active => { if self.active { self.ensure-visible(instant); } }
+                            height: 36px;
+                            label: item.label;
+                            enabled: item.enabled;
+                            border-radius: TempoTokens.radius-lg - TempoTokens.gap4;
+                            background: item.enabled && (self.active || self.hovered) ? TempoTheme.primary-soft : transparent;
+                            activated => { root.choose(i); }
+                            HorizontalLayout {
+                                padding-left: 10px; padding-right: 10px;
+                                spacing: 8px; cross-axis-alignment: center;
+                                if item.icon.width > 0 : TempoIcon { source: item.icon; width: 18px; height: 18px; }
+                                Text {
+                                    text: item.label;
+                                    color: item.enabled ? TempoTheme.text-primary : TempoTheme.text-disabled;
+                                    font-size: 13px; horizontal-stretch: 1; overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export struct TempoReorderItem { label: string, subtitle: string }
+export component TempoReorderList inherits Rectangle {
+    in property <[TempoReorderItem]> items;
+    in property <bool> enabled: true;
+    in property <length> row-height: 52px;
+    out property <int> dragging-from: -1;
+    out property <int> drag-target: -1;
+    callback reordered(int, int);
+    callback activated(int);
+    private property <length> grip-width: 30px;
+    private property <length> edge: min(30px, root.height / 4);
+    private property <length> max-scroll: max(0px, root.items.length * root.row-height - root.height);
+    public function move-row(from: int, to: int) {
+        if root.enabled && from != to && from >= 0 && to >= 0 && from < root.items.length && to < root.items.length {
+            root.reordered(from, to);
+        }
+    }
+    public function reveal(row: int) { rows.ensure-row-visible(row, instant); }
+    function row-at(y: length) -> int {
+        return root.items.length == 0 ? -1
+            : clamp(floor((y - rows.content-y) / max(root.row-height, 1px)), 0, root.items.length - 1);
+    }
+    function finish() {
+        let from = root.dragging-from;
+        let target = root.drag-target;
+        root.dragging-from = -1;
+        root.drag-target = -1;
+        root.move-row(from, target);
+    }
+    clip: true;
+    rows := ListView {
+        horizontal-scrollbar-policy: always-off;
+        x: 0px; y: 0px; width: root.width; height: root.height;
+        vertical-scrollbar-policy: always-off;
+        for item[i] in root.items : Rectangle {
+            height: root.row-height;
+            background: i == root.drag-target ? TempoTheme.primary-soft : TempoTheme.surface;
+            HorizontalLayout {
+                cross-axis-alignment: center;
+                padding-left: 12px; padding-right: root.grip-width; spacing: 4px;
+                TempoAction {
+                    height: root.row-height;
+                    label: item.label;
+                    horizontal-stretch: 1;
+                    activated => { root.activated(i); }
+                    VerticalLayout {
+                        alignment: center; spacing: 3px;
+                        Text { text: item.label; color: TempoTheme.text-primary; font-size: 14px; overflow: elide; }
+                        if item.subtitle != "" : Text { text: item.subtitle; color: TempoTheme.text-secondary; font-size: 11px; overflow: elide; }
+                    }
+                }
+                TempoIconButton {
+                    size: 29px; icon-size: 16px; icon: TempoIcons.chevron-down;
+                    label: "Move " + item.label + " down";
+                    enabled: root.enabled && i + 1 < root.items.length;
+                    activated => { root.move-row(i, i + 1); }
+                }
+                TempoIconButton {
+                    size: 29px; icon-size: 16px; icon: TempoIcons.chevron-up;
+                    label: "Move " + item.label + " up";
+                    enabled: root.enabled && i > 0;
+                    activated => { root.move-row(i, i - 1); }
+                }
+            }
+            TempoIcon {
+                source: TempoIcons.list;
+                x: parent.width - 23px; width: 16px; height: 16px;
+            }
+            Rectangle { y: parent.height - 1px; height: 1px; background: TempoTheme.border; }
+        }
+    }
+    grip := TouchArea {
+        x: root.width - root.grip-width; width: root.grip-width;
+        height: root.height;
+        enabled: root.enabled;
+        mouse-cursor: root.dragging-from >= 0 ? grabbing : grab;
+        pointer-event(event) => {
+            if event.kind == down && event.button == left && self.mouse-y - rows.content-y < root.items.length * root.row-height {
+                root.dragging-from = root.row-at(self.mouse-y);
+                root.drag-target = root.dragging-from;
+            } else if event.kind == up && root.dragging-from >= 0 {
+                root.finish();
+            } else if event.kind == cancel {
+                root.dragging-from = -1; root.drag-target = -1;
+            }
+        }
+        moved => {
+            if root.dragging-from >= 0 { root.drag-target = root.row-at(self.mouse-y); }
+        }
+    }
+    Timer {
+        interval: 32ms;
+        running: root.dragging-from >= 0 && (grip.mouse-y < root.edge || grip.mouse-y >= root.height - root.edge);
+        triggered => {
+            rows.content-y = clamp(rows.content-y + (grip.mouse-y < root.edge ? 12px : -12px), -root.max-scroll, 0px);
+            root.drag-target = root.row-at(grip.mouse-y);
+        }
+    }
+}

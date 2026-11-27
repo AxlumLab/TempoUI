@@ -1,0 +1,76 @@
+import { Palette } from "std-widgets.slint";
+
+// FinUI palette and measurements adapted under MIT. See LICENSES/FinUI-MIT.txt.
+export struct TempoAccent { primary: color, hover: color, pressed: color, soft: color, subtle: color }
+
+export global TempoTheme {
+    in-out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    in property <bool> override-accent;
+    in property <bool> follow-platform-accent;
+    in property <TempoAccent> accent;
+    private property <color> platform-accent: Palette.accent-background;
+    out property <color> primary: self.override-accent ? self.accent.primary : self.follow-platform-accent ? self.platform-accent : self.dark ? #8EA8FF : #3F63D8;
+    out property <color> primary-hover: self.override-accent ? self.accent.hover : self.follow-platform-accent ? self.platform-accent.brighter(0.12) : self.dark ? #A3BAFF : #3451C0;
+    out property <color> primary-pressed: self.override-accent ? self.accent.pressed : self.follow-platform-accent ? self.platform-accent.darker(0.14) : self.dark ? #7A97F0 : #2A41A0;
+    out property <color> primary-soft: self.override-accent ? self.accent.soft : self.follow-platform-accent ? self.platform-accent.with-alpha(0.14) : self.dark ? #1A2240 : #EEF2FF;
+    out property <color> primary-subtle: self.override-accent ? self.accent.subtle : self.follow-platform-accent ? self.platform-accent.with-alpha(0.22) : self.dark ? #1E2D5C : #DCE3FF;
+    out property <color> background: self.dark ? #0F1115 : #F6F7F9;
+    out property <color> background-alt: self.dark ? #141720 : #F0F3F8;
+    out property <color> surface: self.dark ? #171A20 : #FFFFFF;
+    out property <color> surface-alt: self.dark ? #1D2029 : #F8FAFC;
+    out property <color> surface-pressed: self.dark ? #242833 : #F1F5F9;
+    out property <color> border: self.dark ? #2A303A : #E1E4EA;
+    out property <color> border-strong: self.dark ? #37404D : #CCD2DC;
+    out property <color> text-primary: self.dark ? #EEF0F4 : #171A1F;
+    out property <color> text-secondary: self.dark ? #A6ACB8 : #68707D;
+    out property <color> text-tertiary: self.dark ? #8A909D : #8A93A3;
+    out property <color> text-disabled: self.dark ? #58606D : #A8B1BF;
+    out property <color> text-inverse: self.dark ? #141720 : #FFFFFF;
+    out property <color> success: self.dark ? #34D399 : #168A5B;
+    out property <color> success-soft: self.dark ? #0C2E22 : #ECFDF5;
+    out property <color> warning: self.dark ? #FBBF24 : #D68D00;
+    out property <color> warning-soft: self.dark ? #2E2306 : #FFFBEB;
+    out property <color> danger: self.dark ? #F97066 : #D92D20;
+    out property <color> danger-hover: self.dark ? #EF4444 : #B42318;
+    out property <color> danger-soft: self.dark ? #2E1414 : #FEF3F2;
+    out property <color> info: self.dark ? #38BDF8 : #2E90FA;
+    out property <color> info-soft: self.dark ? #0A2330 : #EFF8FF;
+}
+
+export global TempoTokens {
+    out property <length> radius-xs: 6px;
+    out property <length> radius-sm: 10px;
+    out property <length> radius-md: 12px;
+    out property <length> radius-lg: 14px;
+    out property <length> radius-xl: 18px;
+    out property <length> radius-full: 999px;
+    out property <length> gap2: 2px;
+    out property <length> gap4: 4px;
+    out property <length> gap6: 6px;
+    out property <length> gap8: 8px;
+    out property <length> gap10: 10px;
+    out property <length> gap12: 12px;
+    out property <length> gap14: 14px;
+    out property <length> gap16: 16px;
+    out property <length> gap20: 20px;
+    out property <length> gap24: 24px;
+    out property <length> gap32: 32px;
+    out property <length> page-padding: 16px;
+    out property <length> section-gap: 16px;
+    out property <length> tile-gap: 8px;
+    out property <length> input-height: 44px;
+    out property <length> button-height: 42px;
+    out property <length> small-button-height: 34px;
+    out property <length> tile-min-height: 52px;
+    out property <length> bottom-tab-height: 58px;
+    out property <length> desktop-nav-rail-width: 78px;
+    out property <length> desktop-nav-rail-extended-width: 220px;
+    out property <length> icon-sm: 16px;
+    out property <length> icon-md: 20px;
+    out property <length> icon-lg: 24px;
+    out property <length> border-width: 1px;
+    out property <duration> fast: 120ms;
+    out property <duration> normal: 180ms;
+    out property <length> rail-breakpoint: 720px;
+    out property <length> extended-rail-breakpoint: 1100px;
+}

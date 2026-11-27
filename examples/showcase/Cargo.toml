@@ -1,0 +1,16 @@
+[package]
+name = "tempo-ui-showcase"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+tempo-ui = { path = "../..", features = ["finui-font-fallback"] }
+slint = { workspace = true, features = ["std", "backend-winit", "renderer-femtovg", "renderer-software", "accessibility", "compat-1-2"] }
+png = "0.18"
+
+[build-dependencies]
+slint-build.workspace = true

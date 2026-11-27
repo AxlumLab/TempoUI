@@ -1,0 +1,57 @@
+import { TempoTokens } from "theme.slint";
+
+export global TempoMotionSettings {
+    // Slint also respects the native reduced-motion setting on supported backends.
+    in-out property <bool> reduced: false;
+}
+
+export component TempoPresence inherits Rectangle {
+    in property <bool> active;
+    in property <duration> enter-time: TempoTokens.normal;
+    in property <duration> exit-time: TempoTokens.fast;
+    out property <float> progress: root.active ? 1.0 : 0.0;
+    out property <bool> present: root.active || root.progress > 0.0;
+    callback exited();
+    animate progress {
+        enabled: !TempoMotionSettings.reduced;
+        duration: root.active ? root.enter-time : root.exit-time;
+        easing: cubic-bezier(0.215, 0.61, 0.355, 1.0);
+    }
+    changed present => { if !root.present { root.exited(); } }
+}
+
+// A changed destination gets a fresh, bounded enter transition, without keeping
+// an animation tick alive while the page is idle. The host owns the route stack.
+export component TempoRouteMotion inherits Rectangle {
+    in property <int> route-key;
+    in property <int> direction: 1;
+    in property <bool> enabled: true;
+    in property <length> travel: 22px;
+    private property <bool> moving: false;
+    private property <int> enter-direction: 1;
+    out property <float> progress: root.moving ? 0.0 : 1.0;
+    animate progress {
+        enabled: !root.moving && root.enabled && !TempoMotionSettings.reduced;
+        duration: 240ms;
+        easing: cubic-bezier(0.2, 0.65, 0.3, 1.0);
+    }
+    changed route-key => {
+        if root.enabled && !TempoMotionSettings.reduced {
+            root.enter-direction = root.direction;
+            root.moving = true;
+            kickoff.running = true;
+        }
+    }
+    kickoff := Timer {
+        interval: 16ms;
+        running: false;
+        triggered => { self.running = false; root.moving = false; }
+    }
+    clip: true;
+    Rectangle {
+        x: (1.0 - root.progress) * root.travel * root.enter-direction;
+        width: root.width; height: root.height;
+        opacity: 0.7 + 0.3 * root.progress;
+        @children
+    }
+}

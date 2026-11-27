@@ -1,0 +1,34 @@
+[workspace]
+members = ["examples/showcase"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+repository = "https://github.com/AxlumLab/TempoUI"
+
+[workspace.dependencies]
+slint = { version = "=1.19.1", default-features = false }
+slint-build = "=1.19.1"
+
+[package]
+name = "tempo-ui"
+description = "Rust helpers for the Tempo UI component library for Slint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = []
+finui-font-fallback = ["dep:slint"]
+
+[dependencies]
+slint = { workspace = true, optional = true, features = ["std", "unstable-fontique-012", "compat-1-2"] }
+
+[profile.dev]
+debug = 0

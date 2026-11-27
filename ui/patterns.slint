@@ -1,0 +1,181 @@
+import { TempoMotionSettings } from "motion.slint";
+import { ProgressIndicator } from "std-widgets.slint";
+import { TempoIcons } from "icons.slint";
+import { TempoTheme, TempoTokens } from "theme.slint";
+import { TempoAction, TempoButton, TempoIcon, TempoSurface } from "controls.slint";
+
+export component TempoDivider inherits Rectangle {
+    height: TempoTokens.border-width;
+    background: TempoTheme.border;
+}
+
+export component TempoSection inherits VerticalLayout {
+    in property <string> title;
+    spacing: TempoTokens.gap8;
+    if root.title != "" : Text {
+        text: root.title;
+        color: TempoTheme.text-secondary;
+        font-size: 13px;
+        font-weight: 700;
+    }
+    TempoSurface {
+        clip: true;
+        VerticalLayout { @children }
+    }
+}
+
+export component TempoTile inherits TempoAction {
+    in property <string> subtitle;
+    in property <image> icon;
+    in property <image> trailing-icon;
+    min-height: TempoTokens.tile-min-height;
+    // The enclosing section clips row highlights to its own corners.
+    background: root.enabled && root.hovered ? TempoTheme.surface-alt : transparent;
+    HorizontalLayout {
+        padding-top: 10px; padding-bottom: 10px;
+        padding-left: 14px; padding-right: 14px;
+        cross-axis-alignment: center;
+        spacing: 12px;
+        if root.icon.width > 0 : Rectangle {
+            width: 36px; height: 36px;
+            border-radius: TempoTokens.radius-sm;
+            background: TempoTheme.primary-soft;
+            TempoIcon { source: root.icon; tint: TempoTheme.primary; width: 20px; height: 20px; }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text { text: root.label; font-size: 14px; font-weight: 600; color: root.enabled ? TempoTheme.text-primary : TempoTheme.text-disabled; overflow: elide; }
+            if root.subtitle != "" : Text {
+                text: root.subtitle; color: root.enabled ? TempoTheme.text-tertiary : TempoTheme.text-disabled;
+                font-size: 12px; overflow: elide;
+            }
+        }
+        if root.trailing-icon.width > 0 : TempoIcon {
+            source: root.trailing-icon; tint: TempoTheme.text-tertiary;
+            width: 20px; height: 20px;
+        }
+        @children
+    }
+}
+
+export component TempoSelectionTile inherits TempoAction {
+    in-out property <bool> checked;
+    in property <string> subtitle;
+    in property <image> check-icon: TempoIcons.checkmark-small;
+    in property <bool> radio-style: false;
+    accessible-role: checkbox;
+    accessible-checked: root.checked;
+    min-height: TempoTokens.tile-min-height;
+    // The enclosing section clips row highlights to its own corners.
+    background: root.enabled && root.hovered ? TempoTheme.surface-alt : transparent;
+    activated => { root.checked = !root.checked; }
+    HorizontalLayout {
+        padding-top: 10px; padding-bottom: 10px;
+        padding-left: 14px; padding-right: 14px;
+        cross-axis-alignment: center;
+        spacing: TempoTokens.gap10;
+        Rectangle {
+            width: 20px; height: 20px;
+            border-radius: root.radio-style ? TempoTokens.radius-full : TempoTokens.radius-xs;
+            border-width: TempoTokens.border-width;
+            border-color: root.checked ? TempoTheme.primary : TempoTheme.border-strong;
+            background: root.checked ? TempoTheme.primary : TempoTheme.surface;
+            animate background { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+            if root.checked : TempoIcon {
+                source: root.radio-style ? TempoIcons.circle-filled : root.check-icon; tint: TempoTheme.text-inverse;
+                width: root.radio-style ? 8px : 15px; height: self.width;
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text { text: root.label; font-size: 14px; font-weight: 600; color: root.enabled ? TempoTheme.text-primary : TempoTheme.text-disabled; overflow: elide; }
+            if root.subtitle != "" : Text {
+                text: root.subtitle; font-size: 12px; color: TempoTheme.text-secondary; overflow: elide;
+            }
+        }
+    }
+}
+
+export component TempoRadioTile inherits TempoSelectionTile {
+    radio-style: true;
+    accessible-role: radio-button;
+    activated => { root.checked = true; }
+}
+
+export struct TempoSegment { label: string, icon: image }
+
+export component TempoSegmentedControl inherits HorizontalLayout {
+    in property <[TempoSegment]> items;
+    in property <int> selected;
+    callback selected-index(int);
+    spacing: TempoTokens.gap6;
+    for item[index] in root.items : segment := TempoAction {
+        private property <bool> active: index == root.selected;
+        private property <color> ink: active ? TempoTheme.primary : TempoTheme.text-secondary;
+        horizontal-stretch: 1;
+        label: item.label;
+        border-radius: TempoTokens.radius-sm;
+        border-width: TempoTokens.border-width;
+        border-color: active ? TempoTheme.primary.with-alpha(0.45) : TempoTheme.border;
+        background: active ? TempoTheme.primary-soft : TempoTheme.surface;
+        animate background, border-color { enabled: !TempoMotionSettings.reduced; duration: TempoTokens.fast; }
+        activated => { root.selected-index(index); }
+        VerticalLayout {
+            padding-top: 8px; padding-bottom: 8px;
+            spacing: TempoTokens.gap4;
+            if item.icon.width > 0 : HorizontalLayout {
+                alignment: center;
+                TempoIcon { source: item.icon; tint: segment.ink; width: 18px; height: 18px; }
+            }
+            Text {
+                text: item.label; color: segment.ink;
+                font-size: item.icon.width > 0 ? 11px : 13px;
+                font-weight: segment.active ? 600 : 400;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}
+
+export component TempoProgressBar inherits Rectangle {
+    in property <float> value;
+    in property <bool> indeterminate;
+    height: 6px;
+    border-radius: TempoTokens.radius-full;
+    background: TempoTheme.surface-alt;
+    accessible-role: progress-indicator;
+    accessible-value: root.indeterminate ? "" : round(clamp(root.value, 0, 1) * 100) + "%";
+    if root.indeterminate : ProgressIndicator { indeterminate: true; height: root.height; }
+    if !root.indeterminate : Rectangle {
+        x: 0px;
+        width: parent.width * clamp(root.value, 0, 1);
+        border-radius: TempoTokens.radius-full;
+        background: TempoTheme.primary;
+    }
+}
+
+export component TempoEmptyState inherits VerticalLayout {
+    in property <image> icon: TempoIcons.empty;
+    in property <string> title;
+    in property <string> message;
+    in property <string> action-label;
+    callback action();
+    padding-left: 32px; padding-right: 32px;
+    padding-top: 24px; padding-bottom: 24px;
+    spacing: TempoTokens.gap6;
+    if root.icon.width > 0 : HorizontalLayout {
+        alignment: center;
+        TempoIcon { source: root.icon; tint: TempoTheme.text-tertiary; width: 48px; height: 48px; }
+    }
+    Text { text: root.title; color: TempoTheme.text-primary; font-size: 16px; font-weight: 600; horizontal-alignment: center; }
+    if root.message != "" : Text {
+        text: root.message; color: TempoTheme.text-secondary; font-size: 13px; wrap: word-wrap; horizontal-alignment: center;
+    }
+    if root.action-label != "" : HorizontalLayout {
+        alignment: center;
+        padding-top: 10px;
+        TempoButton { label: root.action-label; variant: secondary; activated => { root.action(); } }
+    }
+}
