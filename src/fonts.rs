@@ -1,8 +1,8 @@
 use slint::fontique_012::{fontique, set_shared_collection};
 
-/// Prefer the same installed CJK fallback families as FinUI without bundling platform fonts.
+/// Prefer installed CJK fallback families without bundling platform fonts.
 /// Call before constructing a Slint window.
-pub fn configure_finui_fallbacks() -> Result<(), slint::PlatformError> {
+pub fn configure_cjk_fallbacks() -> Result<(), slint::PlatformError> {
     let mut collection = fontique::Collection::new(fontique::CollectionOptions {
         shared: true,
         ..Default::default()

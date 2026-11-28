@@ -15,10 +15,8 @@ fi
 
 for renderer in "${renderers[@]}"; do
     export SLINT_BACKEND="$renderer"
-    "$showcase" --music --smoke
-    "$showcase" --music --compact --dark --smoke
-    "$showcase" --catalog --smoke
-    "$showcase" --catalog --compact --dark --smoke
+    "$showcase" --smoke
+    "$showcase" --compact --dark --smoke
     "$showcase" --layout --wide --smoke
     "$showcase" --motion-smoke
     "$showcase" --motion-smoke --compact --dark

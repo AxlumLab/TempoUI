@@ -8,5 +8,6 @@ fn main() {
     let config = slint_build::CompilerConfiguration::new()
         .with_library_paths(libraries)
         .embed_resources(slint_build::EmbedResourcesKind::EmbedFiles);
-    slint_build::compile_with_config("ui/demo.slint", config).expect("compile Tempo UI showcase");
+    slint_build::compile_with_config("ui/catalog.slint", config)
+        .expect("compile Tempo UI showcase");
 }

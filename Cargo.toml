@@ -25,7 +25,7 @@ publish = false
 
 [features]
 default = []
-finui-font-fallback = ["dep:slint"]
+cjk-font-fallback = ["dep:slint"]
 
 [dependencies]
 slint = { workspace = true, optional = true, features = ["std", "unstable-fontique-012", "compat-1-2"] }

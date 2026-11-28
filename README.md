@@ -1,6 +1,6 @@
 # Tempo UI
 
-Tempo UI is a Slint component library derived from FinUI. It includes themed controls, responsive navigation, dialogs and sheets, refreshable and reorderable lists, motion helpers, and a set of Fluent icons. The Slint components share a single import. The optional Rust helpers cover route history and CJK font fallback.
+Tempo UI is a modern component library for Rust applications built with Slint. It includes themed controls, responsive navigation, dialogs and sheets, refreshable and reorderable lists, motion helpers, and a set of Fluent icons. The Slint components share a single import. The optional Rust helpers cover route history and CJK font fallback.
 
 ![Tempo UI desktop component gallery](docs/images/catalog-desktop.png)
 
@@ -17,9 +17,8 @@ cargo run --release --locked -p tempo-ui-showcase
 | `--compact --dark` | Narrow dark layout |
 | `--layout --wide` | Three-pane layout |
 | `--lists` | Virtualized list, queue reordering, and action menu |
-| `--music` | FMusic-inspired sample browser with simulated playback |
 
-The showcase prefers FemtoVG and includes a software renderer. Set `SLINT_BACKEND=winit-software` to select software rendering. See the [narrow layout](docs/images/catalog-compact.png) and [list controls](docs/images/flutter-replacements-compact.png).
+The showcase prefers FemtoVG and includes a software renderer. Set `SLINT_BACKEND=winit-software` to select software rendering. See the [narrow layout](docs/images/catalog-compact.png) and [list controls](docs/images/list-controls-compact.png).
 
 ## Use the components
 
@@ -52,7 +51,7 @@ export component App inherits Window {
 }
 ```
 
-The [showcase build script](examples/showcase/build.rs) uses this same import mechanism. For Rust route history, add `tempo-ui = { path = "vendor/TempoUI" }` under `[dependencies]`. Enable the `finui-font-fallback` feature to use `tempo_ui::fonts::configure_finui_fallbacks()` before constructing a window.
+The [showcase build script](examples/showcase/build.rs) uses this same import mechanism. For Rust route history, add `tempo-ui = { path = "vendor/TempoUI" }` under `[dependencies]`. Enable the `cjk-font-fallback` feature to use `tempo_ui::fonts::configure_cjk_fallbacks()` before constructing a window.
 
 ## Verification
 
@@ -61,8 +60,8 @@ cargo test --workspace --locked
 ./scripts/check.sh
 ```
 
-The smoke checks require a graphical session and cover wide and narrow layouts, keyboard and pointer input, overlays, refresh, list virtualization, and animations. GitHub Actions runs the software-renderer checks on Linux. See the [FinUI component mapping](docs/PORTING.md) and [Flutter-to-Slint implementation notes](docs/REPLACEMENTS.md) for the scope of platform-specific behavior.
+The smoke checks require a graphical session and cover wide and narrow layouts, keyboard and pointer input, overlays, refresh, list virtualization, and animations. GitHub Actions runs the software-renderer checks on Linux.
 
 ## License
 
-Tempo UI uses the [MIT license](LICENSE). Attribution for the FinUI adaptation and Microsoft Fluent System Icons is in [LICENSES](LICENSES/).
+Tempo UI uses the [MIT license](LICENSE). Third-party notices are in [LICENSES](LICENSES/).

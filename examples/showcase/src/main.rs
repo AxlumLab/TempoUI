@@ -19,9 +19,6 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 struct Options {
     compact: bool,
     dark: bool,
-    settings: bool,
-    catalog: bool,
-    music: bool,
     wide: bool,
     layout: bool,
     lists: bool,
@@ -37,27 +34,21 @@ fn options() -> Result<Options> {
         match arg.as_str() {
             "--compact" => options.compact = true,
             "--dark" => options.dark = true,
-            "--settings" => options.settings = true,
-            "--catalog" => options.catalog = true,
-            "--music" => options.music = true,
             "--wide" => options.wide = true,
             "--layout" => {
-                options.catalog = true;
                 options.layout = true;
             }
             "--lists" => {
-                options.catalog = true;
                 options.lists = true;
             }
             "--motion-smoke" => {
-                options.catalog = true;
                 options.motion_smoke = true;
             }
             "--screenshot" => options.screenshot = Some(args.next().ok_or("missing PNG path")?),
             "--smoke" => options.smoke = true,
             "--help" | "-h" => {
                 println!(
-                    "tempo-ui-showcase [--compact] [--dark] [--catalog|--music|--settings|--layout|--lists] [--wide] [--screenshot PATH] [--smoke|--motion-smoke]"
+                    "tempo-ui-showcase [--compact] [--dark] [--layout|--lists] [--wide] [--screenshot PATH] [--smoke|--motion-smoke]"
                 );
                 std::process::exit(0);
             }
@@ -65,89 +56,6 @@ fn options() -> Result<Options> {
         }
     }
     Ok(options)
-}
-
-fn filtered(tracks: &[DemoTrack], query: &str) -> Vec<DemoTrack> {
-    let query = query.trim().to_lowercase();
-    tracks
-        .iter()
-        .filter(|track| {
-            [&track.title, &track.artist, &track.record]
-                .into_iter()
-                .any(|field| field.to_lowercase().contains(&query))
-        })
-        .cloned()
-        .collect()
-}
-
-fn queue_index(current: i32, delta: i32, length: i32) -> Option<i32> {
-    (length > 0).then(|| (current + delta).rem_euclid(length))
-}
-
-fn select(ui: &DemoWindow, index: i32) {
-    ui.set_current(index);
-    ui.set_position(0.0);
-    ui.set_playing(true);
-}
-
-fn wire(ui: &DemoWindow) {
-    let tracks = Rc::new(ui.get_tracks().iter().collect::<Vec<_>>());
-    let visible = Rc::new(VecModel::from(tracks.as_ref().clone()));
-    ui.set_shown_tracks(visible.clone().into());
-    let data = tracks.clone();
-    ui.on_filter(move |query| visible.set_vec(filtered(&data, &query)));
-
-    let weak = ui.as_weak();
-    let data = tracks.clone();
-    ui.on_choose(move |title| {
-        if let (Some(ui), Some(index)) = (
-            weak.upgrade(),
-            data.iter().position(|track| track.title == title),
-        ) {
-            select(&ui, index as i32);
-        }
-    });
-
-    let weak = ui.as_weak();
-    let length = tracks.len() as i32;
-    ui.on_step(move |delta| {
-        if let Some(ui) = weak.upgrade() {
-            if let Some(index) = queue_index(ui.get_current(), delta, length) {
-                select(&ui, index);
-            }
-        }
-    });
-
-    let timer = Timer::default();
-    let weak = ui.as_weak();
-    ui.on_playback_changed(move |playing| {
-        if !playing {
-            timer.stop();
-            return;
-        }
-        let weak = weak.clone();
-        let tracks = tracks.clone();
-        let last_tick = Cell::new(Instant::now());
-        timer.start(
-            slint::TimerMode::Repeated,
-            Duration::from_millis(200),
-            move || {
-                let Some(ui) = weak.upgrade() else { return };
-                if !ui.get_playing() {
-                    return;
-                }
-                let now = Instant::now();
-                let elapsed = now.duration_since(last_tick.replace(now)).as_secs_f32();
-                let track = &tracks[ui.get_current() as usize];
-                let position = ui.get_position() + elapsed / track.seconds as f32;
-                if position >= 1.0 {
-                    ui.invoke_step(1);
-                } else {
-                    ui.set_position(position);
-                }
-            },
-        );
-    });
 }
 
 fn save_screenshot(window: &slint::Window, path: &Path) -> Result<()> {
@@ -170,10 +78,6 @@ fn click_in(window: &slint::Window, x: f32, y: f32) {
     window.dispatch_event(WindowEvent::PointerReleased { position, button });
 }
 
-fn click(ui: &DemoWindow, x: f32, y: f32) {
-    click_in(ui.window(), x, y);
-}
-
 fn drag(window: &slint::Window, x: f32, y: f32, dy: f32) {
     use slint::platform::{PointerEventButton, WindowEvent};
     let start = slint::LogicalPosition::new(x, y);
@@ -192,48 +96,6 @@ fn drag(window: &slint::Window, x: f32, y: f32, dy: f32) {
         position: end,
         button,
     });
-}
-
-fn smoke_check(ui: &DemoWindow, compact: bool, dark: bool) -> Result<()> {
-    if ui.get_compact() != compact || ui.get_dark() != dark {
-        return Err("initial viewport or theme did not apply".into());
-    }
-    ui.invoke_filter("  NORTHBOUND ".into());
-    if ui.get_shown_tracks().row_count() != 2 {
-        return Err("artist filter did not update the visible model".into());
-    }
-    let window = ui.window();
-    let size = window.size().to_logical(window.scale_factor());
-    if compact {
-        click(ui, size.width * 0.625, size.height - 28.0);
-    } else {
-        click(ui, size.width - 39.0, size.height - 38.0);
-    }
-    if ui.get_page() != 2 {
-        return Err("queue navigation did not respond to pointer input".into());
-    }
-    ui.invoke_choose("Sea Glass".into());
-    if ui.get_page() != 2 || ui.get_current() != 2 || !ui.get_playing() || ui.get_position() != 0.0
-    {
-        return Err("queue selection did not update player state".into());
-    }
-    ui.invoke_step(-1);
-    if ui.get_current() != 1 {
-        return Err("previous track did not update the queue".into());
-    }
-    click(ui, size.width - if compact { 37.0 } else { 47.0 }, 33.0);
-    if ui.get_dark() == dark {
-        return Err("theme control did not respond to pointer input".into());
-    }
-    if compact {
-        click(ui, size.width * 0.875, size.height - 28.0);
-    } else {
-        click(ui, 60.0, 265.0);
-    }
-    if ui.get_page() != 3 {
-        return Err("settings showcase did not open".into());
-    }
-    Ok(())
 }
 
 fn sync_route(ui: &TempoCatalogWindow, stack: &navigation::RouteStacks<i32>, tab: usize) {
@@ -640,12 +502,23 @@ fn run_motion_smoke(ui: &TempoCatalogWindow, screenshot: Option<String>) -> Resu
                         if !sampled_route.get() || ui.get_detail_progress() < 0.98 {
                             return Err("route transition had no intermediate frames or never settled".into());
                         }
+                        ui.set_route_direction(0);
+                        ui.set_detail(2);
+                        stage.set(4); started.set(Instant::now());
+                    }
+                }
+                4 => {
+                    if mid(ui.get_detail_progress()) {
                         ui.set_reduced_motion(true);
+                        ui.invoke_pop_detail();
                         ui.invoke_show_dialog();
-                        if ui.get_dialog_progress() < 0.999 {
+                        if ui.get_detail_progress() < 0.999 || ui.get_dialog_progress() < 0.999 {
                             return Err("reduced motion did not bypass animation".into());
                         }
                         return Ok(true);
+                    }
+                    if elapsed >= Duration::from_millis(250) {
+                        return Err("sibling destination did not animate".into());
                     }
                 }
                 _ => {}
@@ -670,86 +543,6 @@ fn run_motion_smoke(ui: &TempoCatalogWindow, screenshot: Option<String>) -> Resu
 }
 
 fn main() -> Result<()> {
-    let options = options()?;
-    tempo_ui::fonts::configure_finui_fallbacks()?;
-    if options.catalog || (!options.music && !options.settings) {
-        return run_catalog(options);
-    }
-    let ui = DemoWindow::new()?;
-    ui.set_dark(options.dark);
-    if options.settings {
-        ui.set_page(3);
-    }
-    wire(&ui);
-    if options.compact {
-        ui.window().set_size(LogicalSize::new(390.0, 780.0));
-    } else {
-        ui.window().set_size(LogicalSize::new(1180.0, 820.0));
-    }
-
-    if options.screenshot.is_some() || options.smoke {
-        let outcome = Rc::new(std::cell::RefCell::new(None));
-        let result = outcome.clone();
-        let weak = ui.as_weak();
-        Timer::single_shot(Duration::from_millis(450), move || {
-            let result_value = (|| -> Result<()> {
-                let ui = weak.upgrade().ok_or("preview disappeared before capture")?;
-                if let Some(path) = &options.screenshot {
-                    save_screenshot(ui.window(), Path::new(path))?;
-                }
-                if options.smoke {
-                    ui.set_page(0);
-                    smoke_check(&ui, options.compact, options.dark)?;
-                    println!("Tempo UI smoke check passed");
-                }
-                Ok(())
-            })();
-            *result.borrow_mut() = Some(result_value);
-            let _ = slint::quit_event_loop();
-        });
-        ui.run()?;
-        return outcome
-            .borrow_mut()
-            .take()
-            .ok_or("preview closed before checks completed")?;
-    }
-
-    ui.run()?;
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn filtering_matches_titles_artists_and_albums() {
-        let track = DemoTrack {
-            title: "Sea Glass".into(),
-            artist: "Northbound".into(),
-            record: "Coastline".into(),
-            ..Default::default()
-        };
-        let tracks = [track];
-        for query in ["", "  GLASS ", "north", "coast"] {
-            assert_eq!(filtered(&tracks, query).len(), 1, "{query}");
-        }
-        assert!(filtered(&tracks, "unknown").is_empty());
-    }
-
-    #[test]
-    fn reorder_keeps_the_moved_entry_and_validates_indexes() {
-        let mut entries = vec!["one", "two", "three"];
-        assert!(move_index(&mut entries, 0, 2));
-        assert_eq!(entries, ["two", "three", "one"]);
-        assert!(!move_index(&mut entries, 7, 0));
-        assert_eq!(entries.len(), 3);
-    }
-
-    #[test]
-    fn queue_wraps_in_both_directions() {
-        assert_eq!(queue_index(0, -1, 6), Some(5));
-        assert_eq!(queue_index(5, 1, 6), Some(0));
-        assert_eq!(queue_index(0, 1, 0), None);
-    }
+    tempo_ui::fonts::configure_cjk_fallbacks()?;
+    run_catalog(options()?)
 }

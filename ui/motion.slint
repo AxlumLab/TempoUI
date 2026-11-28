@@ -24,25 +24,29 @@ export component TempoPresence inherits Rectangle {
 // an animation tick alive while the page is idle. The host owns the route stack.
 export component TempoRouteMotion inherits Rectangle {
     in property <int> route-key;
+    // Zero gives sibling destinations a fade without implying forward or back.
     in property <int> direction: 1;
     in property <bool> enabled: true;
-    in property <length> travel: 22px;
+    in property <length> travel: 9px;
+    in property <duration> enter-time: 185ms;
     private property <bool> moving: false;
     private property <int> enter-direction: 1;
-    out property <float> progress: root.moving ? 0.0 : 1.0;
-    animate progress {
+    private property <float> enter-progress: root.moving ? 0.0 : 1.0;
+    out property <float> progress: root.enabled && !TempoMotionSettings.reduced ? root.enter-progress : 1.0;
+    animate enter-progress {
         enabled: !root.moving && root.enabled && !TempoMotionSettings.reduced;
-        duration: 240ms;
-        easing: cubic-bezier(0.2, 0.65, 0.3, 1.0);
+        duration: root.enter-time;
+        easing: cubic-bezier(0.22, 0.61, 0.36, 1.0);
     }
     changed route-key => {
         if root.enabled && !TempoMotionSettings.reduced {
-            root.enter-direction = root.direction;
+            root.enter-direction = clamp(root.direction, -1, 1);
             root.moving = true;
             kickoff.running = true;
         }
     }
     kickoff := Timer {
+        // Give Slint one frame to apply the reset before easing in.
         interval: 16ms;
         running: false;
         triggered => { self.running = false; root.moving = false; }
@@ -51,7 +55,7 @@ export component TempoRouteMotion inherits Rectangle {
     Rectangle {
         x: (1.0 - root.progress) * root.travel * root.enter-direction;
         width: root.width; height: root.height;
-        opacity: 0.7 + 0.3 * root.progress;
+        opacity: 0.92 + 0.08 * root.progress;
         @children
     }
 }

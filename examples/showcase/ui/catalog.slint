@@ -8,7 +8,7 @@ import {
 } from "@tempo-ui";
 
 export component TempoCatalogWindow inherits Window {
-    title: "Tempo UI · FinUI comparison";
+    title: "Tempo UI · Components";
     preferred-width: 1180px;
     preferred-height: 820px;
     min-width: 340px;
@@ -102,7 +102,7 @@ export component TempoCatalogWindow inherits Window {
             spacing: 16px;
             catalog-head := TempoPageHead {
                 title: "Components";
-                subtitle: "FinUI comparison · Tempo UI";
+                subtitle: "Interactive component gallery";
                 TempoIconButton {
                     label: "Toggle theme"; tooltip: "Toggle theme"; variant: outline;
                     icon: root.dark ? TempoIcons.light-mode : TempoIcons.dark-mode;
@@ -269,7 +269,7 @@ export component TempoCatalogWindow inherits Window {
             index: 3; selected-index: retained.current-index;
             VerticalLayout {
                 TempoAppBar {
-                    title: "Flutter replacements"; subtitle: "Virtual list · reorder · action menu";
+                    title: "Lists and menus"; subtitle: "Virtual list · reorder · action menu";
                     menu := TempoMenuButton {
                         items: [
                             { label: "Play", enabled: true },
